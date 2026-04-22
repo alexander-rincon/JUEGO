@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin - Torneo {{ room_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div class="brand">
+          <h1 class="title">Panel Admin</h1>
+          <p class="subtitle">Torneo {{ room_id }} · {{ username }}</p>
+        </div>
+        <div class="room">
+          <div class="room__label">Torneo</div>
+          <div class="room__id" id="roomId">{{ room_id }}</div>
+          <a class="room__link" href="{{ url_for('admin_logout') }}">Cerrar sesión</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel__row">
+          <div class="pill" id="connectionPill">Conectando...</div>
+          <div class="pill pill--accent" id="youAre">Organizador</div>
+        </div>
+
+        <div class="status" id="statusText">Cargando panel...</div>
+
+        <section class="adminDash" id="winnerSection">
+          <div class="adminDash__title">Ganador final</div>
+          <div class="adminDash__row">
+            <div class="adminDash__box" style="width: 100%;">
+              <div class="adminDash__label">Campeón: <span id="winnerName">—</span></div>
+              <button class="btn btn--paper" id="winnerDetailsBtn" type="button">Ver datos</button>
+              <div id="winnerDetails" hidden>
+                <div class="hint" style="margin-top:10px">
+                  Nombre: <span class="hint__mono" id="winnerName2">—</span>
+                </div>
+                <div class="hint" style="margin-top:10px">
+                  Edad: <span class="hint__mono" id="winnerAge">—</span>
+                </div>
+                <div class="hint" style="margin-top:10px">
+                  Tipo: <span class="hint__mono" id="winnerAccountType">—</span>
+                </div>
+                <div class="hint" style="margin-top:10px">
+                  Cuenta: <span class="hint__mono" id="winnerAccount">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="adminDash">
+          <div class="adminDash__title">Ingreso de jugadores</div>
+          <div class="adminDash__row">
+            <div class="adminDash__box">
+              <div class="adminDash__label">Link para jugadores</div>
+              <a class="adminDash__mono" href="{{ join_url }}" target="_blank" rel="noreferrer">{{ join_url }}</a>
+              <div class="hint" style="margin-top:10px">
+                ID torneo: <span class="hint__mono">{{ room_id }}</span>
+              </div>
+              <div class="hint" style="margin-top:10px">
+                Espectador (admin): <span class="hint__mono">{{ spectator_code }}</span><br />
+                <a class="adminDash__mono" href="{{ spectator_url }}" target="_blank" rel="noreferrer">{{ spectator_url }}</a>
+              </div>
+            </div>
+            <div class="adminDash__box">
+              <div class="adminDash__label">QR (jugadores)</div>
+              <img class="adminDash__qr" alt="QR de ingreso" src="{{ url_for('qr_png', room_id=room_id) }}?u={{ join_url|urlencode }}" />
+            </div>
+          </div>
+
+          <div class="adminDash__label">Códigos (dáselos a cada jugador)</div>
+          <div class="adminDash__codes">
+            {% for c in invite_codes %}
+              <div class="adminDash__code" data-code="{{ c }}" tabindex="0" role="button">{{ c }}</div>
+            {% endfor %}
+          </div>
+          <div class="adminDash__codesBar">
+            <a class="btn btn--paper adminDash__codesBtn" href="{{ url_for('admin_codes_txt', id_torneo=room_id) }}">Descargar TXT</a>
+            <div class="adminDash__codesMsg" id="codesCopyMsg"></div>
+          </div>
+        </section>
+
+        <section class="tournament" id="tournamentBox">
+          <div class="tournament__row">
+            <div class="pill pill--accent" id="tournamentRole">Organizador</div>
+            <button class="btn btn--scissors" id="generateBracketBtn" type="button" hidden>
+              Repartir jugadores
+            </button>
+            <button class="btn btn--paper" id="startNextBtn" type="button" hidden>
+              Iniciar siguiente pelea
+            </button>
+            <button class="btn btn--rock" id="forceBattleBtn" type="button" hidden>
+              BATALLA
+            </button>
+          </div>
+
+          <div class="tournament__lobby" id="tournamentLobby">
+            <div class="tournament__title">Sala en vivo</div>
+            <div class="tournament__hint" id="tournamentCount">—</div>
+            <div class="tournament__players" id="tournamentPlayersList"></div>
+          </div>
+
+          <div class="tournament__active" id="tournamentActive" hidden>
+            <div class="tournament__activeLeft">
+              <div class="tournament__match" id="activeMatchText">—</div>
+              <div class="tournament__throws" id="throwsBox" hidden>
+                <div class="tournament__throw" id="throwP1Card">
+                  <div class="tournament__throwName" id="throwP1Name">—</div>
+                  <div class="tournament__throwIcon" id="throwP1Icon">—</div>
+                  <div class="tournament__throwText" id="throwP1Text">—</div>
+                </div>
+                <div class="tournament__throw" id="throwP2Card">
+                  <div class="tournament__throwName" id="throwP2Name">—</div>
+                  <div class="tournament__throwIcon" id="throwP2Icon">—</div>
+                  <div class="tournament__throwText" id="throwP2Text">—</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn--rock" id="readyBtn" type="button" hidden>Estoy listo</button>
+          </div>
+
+          <div class="tournament__bracket">
+            <div class="tournament__title">Llaves</div>
+            <div class="tournament__bracketList" id="bracketList"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      window.__ROOM_ID__ = "{{ room_id }}";
+      window.__MODE__ = "admin_dashboard";
+    </script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    <div class="modal" id="codeModal" hidden>
+      <div class="modal__overlay" id="codeModalOverlay"></div>
+      <div class="modal__card" role="dialog" aria-modal="true">
+        <div class="modal__title">Código</div>
+        <div class="modal__code" id="codeModalCode">—</div>
+        <div class="modal__actions">
+          <button class="btn btn--paper modal__btn" id="codeModalCopyBtn" type="button">Copiar código</button>
+          <button class="btn btn--rock modal__btn" id="codeModalUpdateBtn" type="button">Cambiar por otro</button>
+          <button class="btn modal__btn" id="codeModalCloseBtn" type="button">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+eventlet==0.36.1
+gunicorn==22.0.0
+qrcode==7.4.2
+Pillow==10.4.0

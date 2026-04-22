@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin - Crear torneo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div class="brand">
+          <h1 class="title">Panel Admin</h1>
+          <p class="subtitle">Configurar torneo</p>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel__row">
+          <div class="pill pill--ok">Listo</div>
+          <div class="pill pill--accent">Organizador</div>
+        </div>
+
+        <div class="status">Crea el torneo y luego reparte los códigos a los jugadores.</div>
+
+        <section class="admin">
+          <div class="admin__title">Configuración</div>
+          <form class="admin__form" action="{{ url_for('admin_setup') }}" method="post">
+            <label class="admin__field">
+              <span class="admin__label">Cantidad de jugadores</span>
+              <input class="admin__input" type="number" name="max_players" min="2" max="64" value="{{ max_players|default(10) }}" required />
+            </label>
+            <label class="admin__field">
+              <span class="admin__label">Premio</span>
+              <input class="admin__input" type="text" name="prize" placeholder="Ej: 200" />
+            </label>
+            <label class="admin__field">
+              <span class="admin__label">Segundos por batalla</span>
+              <input class="admin__input" type="number" name="battle_seconds" min="10" max="600" value="60" required />
+            </label>
+            <label class="admin__field">
+              <span class="admin__label">Segundos de cuenta regresiva</span>
+              <input class="admin__input" type="number" name="countdown_seconds" min="1" max="10" value="3" required />
+            </label>
+            <button class="btn btn--rock" type="submit">Crear torneo</button>
+          </form>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin - Menú</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div class="brand">
+          <h1 class="title">Menú Admin</h1>
+          <p class="subtitle">Usuario: {{ username }}</p>
+        </div>
+        <div class="room">
+          <div class="room__label">Sesión</div>
+          <div class="room__id">OK</div>
+          <a class="room__link" href="{{ url_for('admin_logout') }}">Cerrar sesión</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel__row">
+          <div class="pill pill--ok">Admin</div>
+          <a class="room__link" href="{{ url_for('admin_setup') }}">Crear torneo</a>
+        </div>
+
+        <div class="status">Selecciona una pantalla:</div>
+
+        <section class="adminDash">
+          <div class="adminDash__title">Torneos en memoria</div>
+          {% if tournaments and tournaments|length %}
+            <div class="adminDash__codes">
+              {% for t in tournaments %}
+                <div class="adminDash__box">
+                  <div class="adminDash__label">Torneo {{ t.id }}</div>
+                  <div class="hint" style="margin-top:10px">
+                    <span class="hint__mono">{{ t.count }}/{{ t.max }}</span> registrados
+                  </div>
+                  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <a class="room__link" href="{{ t.admin_url }}">Abrir admin</a>
+                    <a class="room__link" href="{{ t.join_url }}" target="_blank" rel="noreferrer">Link jugadores</a>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="tournament__empty">Aún no hay torneos. Crea uno.</div>
+          {% endif %}
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
