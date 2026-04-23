@@ -412,7 +412,6 @@ def _tournament_profile_payload(room: TournamentRoom, code: str | None) -> dict 
     return {
         "code": code,
         "name": (prof.name if prof else "") or _tournament_name_for_code(room, code),
-        "age": prof.age if prof else "",
         "account_type": prof.account_type if prof else "",
         "account": prof.account if prof else "",
     }
@@ -673,7 +672,7 @@ def index():
     <main class="app app--home">
       <header class="top">
         <div class="brand brand--home">
-          <img class="homeLogo" src="{{ url_for('static', filename='rps/INICIO.jpg') }}" alt="Bienvenidos - Piedra Papel Tijera" />
+          <img class="homeLogo" src="{{ url_for('static', filename='rps/INI1.png') }}" alt="PPT Batallas" />
           <p class="subtitle">Elige cómo entrar</p>
         </div>
       </header>
@@ -903,9 +902,10 @@ def join_tournament(id_torneo: str):
 
     code = (request.form.get("code") or "").strip().upper()
     name = (request.form.get("name") or "").strip()
-    age = (request.form.get("age") or "").strip()
     account_type = (request.form.get("account_type") or "").strip().upper()
     account = (request.form.get("account") or "").strip()
+    if not account or account.strip().upper() == "NO":
+        account = "NO"
 
     with rooms_lock:
         room = rooms.get(id_torneo)
@@ -919,7 +919,7 @@ def join_tournament(id_torneo: str):
             error = "El torneo ya está completo."
         else:
             room.redeemed_codes.add(code)
-            room.profiles[code] = PlayerProfile(code=code, name=name, age=age, account_type=account_type, account=account)
+            room.profiles[code] = PlayerProfile(code=code, name=name, age="", account_type=account_type, account=account)
             player_key = _generate_secret(18)
             room.player_keys[player_key] = code
             error = ""

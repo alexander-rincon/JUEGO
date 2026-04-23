@@ -639,17 +639,15 @@ function renderWinnerProfile(profile) {
   const sec = document.getElementById("winnerSection");
   const nameEl = document.getElementById("winnerName");
   const nameEl2 = document.getElementById("winnerName2");
-  const ageEl = document.getElementById("winnerAge");
   const accountTypeEl = document.getElementById("winnerAccountType");
   const accountEl = document.getElementById("winnerAccount");
   const details = document.getElementById("winnerDetails");
   const btn = document.getElementById("winnerDetailsBtn");
-  if (!sec || !nameEl || !ageEl || !accountEl || !details || !btn || !accountTypeEl) return;
+  if (!sec || !nameEl || !accountEl || !details || !btn || !accountTypeEl) return;
   details.hidden = true;
   if (!profile) {
     nameEl.textContent = "—";
     if (nameEl2) nameEl2.textContent = "—";
-    ageEl.textContent = "—";
     accountTypeEl.textContent = "—";
     accountEl.textContent = "—";
     btn.disabled = true;
@@ -659,7 +657,6 @@ function renderWinnerProfile(profile) {
   const displayName = profile.name || "—";
   nameEl.textContent = displayName;
   if (nameEl2) nameEl2.textContent = displayName;
-  ageEl.textContent = profile.age || "—";
   accountTypeEl.textContent = profile.account_type || "—";
   accountEl.textContent = profile.account || "—";
 }

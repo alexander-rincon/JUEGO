@@ -44,11 +44,7 @@
               <input class="join__input" type="text" name="name" required />
             </label>
             <label class="join__field">
-              <span class="join__label">Edad</span>
-              <input class="join__input" type="text" name="age" required />
-            </label>
-            <label class="join__field">
-              <span class="join__label">Tipo de cuenta</span>
+              <span class="join__label">Tipo de cuenta (donde quieres que te llegue el dinero si ganas)</span>
               <select class="join__input" name="account_type" required>
                 <option value="" {% if not prefill_account_type %}selected{% endif %} disabled>Selecciona</option>
                 <option value="DAVIPLATA" {% if prefill_account_type == 'DAVIPLATA' %}selected{% endif %}>Daviplata</option>
@@ -57,11 +53,12 @@
               </select>
             </label>
             <label class="join__field">
-              <span class="join__label">Número de cuenta</span>
-              <input class="join__input" type="text" name="account" required />
+              <span class="join__label">Número de cuenta (opcional)</span>
+              <input class="join__input" type="text" name="account" placeholder="Opcional: escribe tu número o NO" />
             </label>
             <button class="btn btn--paper" type="submit">Ingresar sala</button>
           </form>
+          <div class="hint" style="margin-top:12px">En caso de que ganes, comunícate con el administrador por Telegram.</div>
         </section>
       </section>
     </main>
