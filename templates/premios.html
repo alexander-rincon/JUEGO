@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Premios</title>
+    <link rel="stylesheet" href="/static/estilos.css" />
+  </head>
+  <body class="page--premios">
+    <main class="app app--premios">
+      <section class="panel premiosPanel">
+        <div class="premiosHead">
+          <div>
+            <div class="premiosTitle">PREMIOS</div>
+            <div class="premiosSub" id="premiosStatus">Cargando...</div>
+          </div>
+          <div class="premiosPrize">
+            <div class="premiosPrize__label">Premio</div>
+            <div class="premiosPrize__value" id="premiosPrize">—</div>
+          </div>
+        </div>
+        <div class="premiosList" id="premiosList"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
+    <script>
+      (function () {
+        const prizeEl = document.getElementById("premiosPrize");
+        const statusEl = document.getElementById("premiosStatus");
+        const listEl = document.getElementById("premiosList");
+
+        function esc(s) {
+          return String(s || "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+        }
+
+        function fmt(n) {
+          const v = Number.isFinite(Number(n)) ? Number(n) : 0;
+          return v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+        }
+
+        const sock = window.io ? window.io({ transports: ["websocket", "polling"] }) : null;
+        if (!sock) return;
+
+        sock.on("connect", () => {
+          sock.emit("join", { room_id: "LOBBY", mode: "lobby_participants" });
+        });
+
+        sock.on("lobby_state", (payload) => {
+          const prize = payload && Number.isFinite(payload.prize_value) ? payload.prize_value : 0;
+          if (prizeEl) prizeEl.textContent = fmt(prize);
+          const winners = payload && Array.isArray(payload.winners) ? payload.winners : [];
+          const by = new Map();
+          for (const w of winners) {
+            const h = w && w.handle ? String(w.handle).trim() : "";
+            if (!h) continue;
+            const key = h.toLowerCase();
+            const prev = by.get(key) || { handle: h, avatar_url: "", total: 0, wins: 0 };
+            const a = w && w.avatar_url ? String(w.avatar_url).trim() : prev.avatar_url;
+            const pv = w && Number.isFinite(w.prize_value) ? Number(w.prize_value) : prize;
+            by.set(key, {
+              handle: h,
+              avatar_url: a || prev.avatar_url,
+              total: (Number.isFinite(prev.total) ? prev.total : 0) + (Number.isFinite(pv) ? pv : 0),
+              wins: (Number.isFinite(prev.wins) ? prev.wins : 0) + 1,
+            });
+          }
+          const rows = Array.from(by.values());
+          rows.sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
+          if (statusEl) statusEl.textContent = rows.length ? `Ganadores: ${rows.length}` : "Aún no hay ganadores.";
+          if (!listEl) return;
+          listEl.innerHTML = rows.length
+            ? rows
+                .map((w, i) => {
+                  const h = w && w.handle ? String(w.handle) : "—";
+                  const a = w && w.avatar_url ? String(w.avatar_url) : "/static/rps/INI1.png";
+                  const total = w && Number.isFinite(w.total) ? Number(w.total) : 0;
+                  const wins = w && Number.isFinite(w.wins) ? Number(w.wins) : 0;
+                  return `<div class="premiosRow">
+                    <img class="premiosAvatar" src="${esc(a)}" alt="${esc(h)}" referrerpolicy="no-referrer" />
+                    <div class="premiosMain">
+                      <div class="premiosName">${i + 1}. ${esc(h)}</div>
+                      <div class="premiosMeta">Acumulado: <span class="premiosMoney">${esc(fmt(total))}</span> · Victorias: <span class="premiosWins">${wins}</span></div>
+                    </div>
+                  </div>`;
+                })
+                .join("")
+            : `<div class="premiosEmpty">Aún no hay ganadores.</div>`;
+        });
+
+        sock.on("error_message", (payload) => {
+          if (statusEl && payload && payload.text) statusEl.textContent = payload.text;
+        });
+      })();
+    </script>
+  </body>
+</html>

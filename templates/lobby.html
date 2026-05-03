@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sala de espera</title>
+    <link rel="stylesheet" href="/static/estilos.css" />
+  </head>
+  <body class="page--lobbyLogin">
+    <main class="app app--lobbyLogin">
+      <div class="lobbyLoginGrid">
+        <section class="lobbyLoginRight">
+          <video class="lobbyLoginVideo" src="/static/rps/login.mp4" autoplay muted loop playsinline preload="metadata" poster="/static/rps/INI1.png"></video>
+        </section>
+        <section class="lobbyLoginLeft">
+          <div class="lobbyLoginCard">
+            <div class="lobbyLoginBrand">
+              <div class="lobbyLoginTitle">Sala de espera</div>
+              <div class="lobbyLoginSub">Ingresa tu @ de TikTok y el código</div>
+            </div>
+            <% if (error) { %>
+              <div class="lobbyLoginError"><%= error %></div>
+            <% } %>
+            <form class="lobbyLoginForm" action="/lobby/enter" method="post">
+              <label class="lobbyLoginField">
+                <span class="lobbyLoginLabel">@ TikTok</span>
+                <input class="lobbyLoginInput" name="handle" type="text" placeholder="@usuario" autocomplete="username" value="<%= handle || '' %>" required />
+              </label>
+              <label class="lobbyLoginField">
+                <span class="lobbyLoginLabel">Código</span>
+                <input class="lobbyLoginInput" name="code" type="text" placeholder="Código" autocomplete="one-time-code" value="<%= code || '' %>" required />
+              </label>
+              <button class="btn btn--paper lobbyLoginBtn" type="submit">Entrar</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

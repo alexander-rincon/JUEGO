@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jugador - Ingresar</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
@@ -15,7 +15,7 @@
         </div>
         <div class="room">
           <div class="room__label">Torneo</div>
-          <div class="room__id">{{ room_id }}</div>
+          <div class="room__id"><%= room_id %></div>
         </div>
       </header>
 
@@ -26,18 +26,18 @@
         </div>
 
         <div class="status">
-          {% if prize %}Premio: <span class="hint__mono">{{ prize }}</span> · {% endif %}
-          <span class="hint__mono">{{ count }}/{{ max_players }}</span> registrados
+          <% if (prize) { %>Premio: <span class="hint__mono"><%= prize %></span> · <% } %>
+          <span class="hint__mono"><%= count %>/<%= max_players %></span> registrados
         </div>
 
         <section class="join">
-          {% if error %}
-            <div class="join__error">{{ error }}</div>
-          {% endif %}
-          <form class="join__form" action="{{ url_for('join_tournament', id_torneo=room_id) }}" method="post">
+          <% if (error) { %>
+            <div class="join__error"><%= error %></div>
+          <% } %>
+          <form class="join__form" action="/join/<%= room_id %>" method="post">
             <label class="join__field">
               <span class="join__label">Código personal</span>
-              <input class="join__input" type="text" name="code" placeholder="Ej: A1B2C3D4" value="{{ prefill_code|default('') }}" required />
+              <input class="join__input" type="text" name="code" placeholder="Ej: A1B2C3D4" value="<%= (prefill_code || '') %>" required />
             </label>
             <label class="join__field">
               <span class="join__label">Nombre</span>
@@ -46,10 +46,10 @@
             <label class="join__field">
               <span class="join__label">Tipo de cuenta (donde quieres que te llegue el dinero si ganas)</span>
               <select class="join__input" name="account_type" required>
-                <option value="" {% if not prefill_account_type %}selected{% endif %} disabled>Selecciona</option>
-                <option value="DAVIPLATA" {% if prefill_account_type == 'DAVIPLATA' %}selected{% endif %}>Daviplata</option>
-                <option value="NEQUI" {% if prefill_account_type == 'NEQUI' %}selected{% endif %}>Nequi</option>
-                <option value="BANCOLOMBIA" {% if prefill_account_type == 'BANCOLOMBIA' %}selected{% endif %}>Bancolombia</option>
+                <option value="" <%= !prefill_account_type ? 'selected' : '' %> disabled>Selecciona</option>
+                <option value="DAVIPLATA" <%= prefill_account_type === 'DAVIPLATA' ? 'selected' : '' %>>Daviplata</option>
+                <option value="NEQUI" <%= prefill_account_type === 'NEQUI' ? 'selected' : '' %>>Nequi</option>
+                <option value="BANCOLOMBIA" <%= prefill_account_type === 'BANCOLOMBIA' ? 'selected' : '' %>>Bancolombia</option>
               </select>
             </label>
             <label class="join__field">

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin - Crear torneo</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
@@ -25,10 +25,10 @@
 
         <section class="admin">
           <div class="admin__title">Configuración</div>
-          <form class="admin__form" action="{{ url_for('admin_setup') }}" method="post">
+          <form class="admin__form" action="/admin/setup" method="post">
             <label class="admin__field">
               <span class="admin__label">Cantidad de jugadores</span>
-              <input class="admin__input" type="number" name="max_players" min="2" max="64" value="{{ max_players|default(10) }}" required />
+              <input class="admin__input" type="number" name="max_players" min="2" max="64" value="<%= (typeof max_players === 'number' ? max_players : 10) %>" required />
             </label>
             <label class="admin__field">
               <span class="admin__label">Premio</span>

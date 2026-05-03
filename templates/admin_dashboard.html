@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin - Torneo {{ room_id }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <title>Admin - Torneo <%= room_id %></title>
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
       <header class="top">
         <div class="brand">
           <h1 class="title">Panel Admin</h1>
-          <p class="subtitle">Torneo {{ room_id }} · {{ username }}</p>
+          <p class="subtitle">Torneo <%= room_id %> · <%= username %></p>
         </div>
         <div class="room">
           <div class="room__label">Torneo</div>
-          <div class="room__id" id="roomId">{{ room_id }}</div>
-          <a class="room__link" href="{{ url_for('admin_logout') }}">Cerrar sesión</a>
+          <div class="room__id" id="roomId"><%= room_id %></div>
+          <a class="room__link" href="/admin/logout">Cerrar sesión</a>
         </div>
       </header>
 
@@ -24,6 +24,7 @@
         <div class="panel__row">
           <div class="pill" id="connectionPill">Conectando...</div>
           <div class="pill pill--accent" id="youAre">Organizador</div>
+          <button class="btn btn--paper" id="audioArmBtn" type="button">Activar audio</button>
         </div>
 
         <div class="status" id="statusText">Cargando panel...</div>
@@ -54,29 +55,29 @@
           <div class="adminDash__row">
             <div class="adminDash__box">
               <div class="adminDash__label">Link para jugadores</div>
-              <a class="adminDash__mono" href="{{ join_url }}" target="_blank" rel="noreferrer">{{ join_url }}</a>
+              <a class="adminDash__mono" href="<%= join_url %>" target="_blank" rel="noreferrer"><%= join_url %></a>
               <div class="hint" style="margin-top:10px">
-                ID torneo: <span class="hint__mono">{{ room_id }}</span>
+                ID torneo: <span class="hint__mono"><%= room_id %></span>
               </div>
               <div class="hint" style="margin-top:10px">
-                Espectador (admin): <span class="hint__mono">{{ spectator_code }}</span><br />
-                <a class="adminDash__mono" href="{{ spectator_url }}" target="_blank" rel="noreferrer">{{ spectator_url }}</a>
+                Espectador (admin): <span class="hint__mono"><%= spectator_code %></span><br />
+                <a class="adminDash__mono" href="<%= spectator_url %>" target="_blank" rel="noreferrer"><%= spectator_url %></a>
               </div>
             </div>
             <div class="adminDash__box">
               <div class="adminDash__label">QR (jugadores)</div>
-              <img class="adminDash__qr" alt="QR de ingreso" src="{{ url_for('qr_png', room_id=room_id) }}?u={{ join_url|urlencode }}" />
+              <img class="adminDash__qr" alt="QR de ingreso" src="/qr/<%= room_id %>.png?u=<%= encodeURIComponent(join_url) %>" />
             </div>
           </div>
 
           <div class="adminDash__label">Códigos (dáselos a cada jugador)</div>
           <div class="adminDash__codes">
-            {% for c in invite_codes %}
-              <div class="adminDash__code" data-code="{{ c }}" tabindex="0" role="button">{{ c }}</div>
-            {% endfor %}
+            <% for (const c of invite_codes) { %>
+              <div class="adminDash__code" data-code="<%= c %>" tabindex="0" role="button"><%= c %></div>
+            <% } %>
           </div>
           <div class="adminDash__codesBar">
-            <a class="btn btn--paper adminDash__codesBtn" href="{{ url_for('admin_codes_txt', id_torneo=room_id) }}">Descargar TXT</a>
+            <a class="btn btn--paper adminDash__codesBtn" href="/admin/t/<%= room_id %>/codes.txt">Descargar TXT</a>
             <div class="adminDash__codesMsg" id="codesCopyMsg"></div>
           </div>
         </section>
@@ -129,11 +130,21 @@
     </main>
 
     <script>
-      window.__ROOM_ID__ = "{{ room_id }}";
+      window.__ROOM_ID__ = "<%= room_id %>";
       window.__MODE__ = "admin_dashboard";
     </script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="/static/script.js"></script>
+
+    <div class="fx" id="tournamentFx" hidden>
+      <div class="fx__overlay"></div>
+      <div class="fx__card" role="status" aria-live="polite">
+        <div class="fx__spark"></div>
+        <div class="fx__badge" id="tournamentFxBadge">—</div>
+        <div class="fx__name" id="tournamentFxName">—</div>
+        <div class="fx__sub" id="tournamentFxSub">—</div>
+      </div>
+    </div>
 
     <div class="modal" id="codeModal" hidden>
       <div class="modal__overlay" id="codeModalOverlay"></div>

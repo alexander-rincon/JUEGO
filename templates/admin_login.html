@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin - Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
@@ -24,11 +24,11 @@
         <div class="status">Ingresa usuario y contraseña.</div>
 
         <section class="admin">
-          {% if error %}
-            <div class="join__error">{{ error }}</div>
-          {% endif %}
-          <form class="admin__form" action="{{ url_for('admin_login') }}" method="post">
-            <input type="hidden" name="next" value="{{ next_url }}" />
+          <% if (error) { %>
+            <div class="join__error"><%= error %></div>
+          <% } %>
+          <form class="admin__form" action="/admin/login" method="post">
+            <input type="hidden" name="next" value="<%= next_url %>" />
             <label class="admin__field">
               <span class="admin__label">Usuario</span>
               <input class="admin__input" type="text" name="username" placeholder="Escribe tu usuario" autocomplete="username" required />

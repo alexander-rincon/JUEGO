@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Torneo</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
       <header class="top">
         <div class="brand">
           <h1 class="title">Torneo</h1>
-          <p class="subtitle">{% if prize %}Premio: {{ prize }}{% else %}Piedra · Papel · Tijera{% endif %}</p>
+          <p class="subtitle"><% if (prize) { %>Premio: <%= prize %><% } else { %>Piedra · Papel · Tijera<% } %></p>
         </div>
       </header>
 
@@ -86,15 +86,25 @@
     </main>
 
     <script>
-      window.__ROOM_ID__ = "{{ room_id }}";
+      window.__ROOM_ID__ = "<%= room_id %>";
       window.__MODE__ = "tournament";
-      window.__PLAYER_KEY__ = "{{ player_key|default('') }}";
-      window.__SPECTATOR_KEY__ = "{{ spectator_key|default('') }}";
-      window.__PRIZE__ = "{{ prize|default('') }}";
-      window.__BATTLE_SECONDS__ = {{ battle_seconds|default(60) }};
-      window.__COUNTDOWN_SECONDS__ = {{ countdown_seconds|default(3) }};
+      window.__PLAYER_KEY__ = "<%= (player_key || '') %>";
+      window.__SPECTATOR_KEY__ = "<%= (spectator_key || '') %>";
+      window.__PRIZE__ = "<%= (prize || '') %>";
+      window.__BATTLE_SECONDS__ = <%= (typeof battle_seconds === 'number' ? battle_seconds : 60) %>;
+      window.__COUNTDOWN_SECONDS__ = <%= (typeof countdown_seconds === 'number' ? countdown_seconds : 3) %>;
     </script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="/static/script.js"></script>
+
+    <div class="fx" id="tournamentFx" hidden>
+      <div class="fx__overlay"></div>
+      <div class="fx__card" role="status" aria-live="polite">
+        <div class="fx__spark"></div>
+        <div class="fx__badge" id="tournamentFxBadge">—</div>
+        <div class="fx__name" id="tournamentFxName">—</div>
+        <div class="fx__sub" id="tournamentFxSub">—</div>
+      </div>
+    </div>
   </body>
 </html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Participantes</title>
+    <link rel="stylesheet" href="/static/estilos.css" />
+  </head>
+  <body class="page--participants">
+    <main class="app app--participants">
+      <header class="top">
+        <div class="brand">
+          <h1 class="title">Participantes</h1>
+          <p class="subtitle">8 mesas · 4 por mesa</p>
+        </div>
+      </header>
+      <section class="panel">
+        <div class="panel__row">
+          <div class="pill" id="connectionPill">Conectando...</div>
+          <div class="pill pill--accent" id="youAre">Pantalla</div>
+          <button class="btn btn--paper" id="lobbyOpenLiveModalBtn" type="button">Conectarse al live</button>
+          <button class="btn btn--paper" id="lobbyBracketShuffleBtn" type="button">Emparejar</button>
+          <button class="btn btn--rock" id="lobbyResetBtn" type="button">Limpiar todo</button>
+        </div>
+        <div class="status" id="statusText">Esperando participantes...</div>
+
+        <div class="participantsTables" id="lobbyTables"></div>
+
+        <div class="lobbyBox" style="margin-top:12px">
+          <div class="lobbyBox__title">Donaciones</div>
+          <div class="lobbyList" id="lobbyPending"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal" id="liveModal" hidden>
+      <div class="modal__backdrop" data-close="1"></div>
+      <div class="modal__card" role="dialog" aria-modal="true">
+        <div class="modal__title">Conectarse al live</div>
+        <div class="modal__sub">Pega el @ del TikTok que está en live</div>
+        <div class="modal__form">
+          <input class="lobbyLoginInput" id="lobbyLiveHandle" type="text" placeholder="@tuusuario" autocomplete="username" />
+          <button class="btn btn--paper" id="lobbyLiveConnectBtn" type="button">Conectar</button>
+          <button class="btn btn--rock" id="lobbyLiveCloseBtn" type="button">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      window.__ROOM_ID__ = "LOBBY";
+      window.__MODE__ = "lobby_participants";
+    </script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
+    <script src="/static/script.js"></script>
+  </body>
+</html>

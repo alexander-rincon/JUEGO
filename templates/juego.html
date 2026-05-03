@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Piedra, Papel o Tijera - Online</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}" />
+    <link rel="stylesheet" href="/static/estilos.css" />
   </head>
   <body>
     <main class="app">
@@ -15,7 +15,7 @@
         </div>
         <div class="room">
           <div class="room__label">Sala</div>
-          <div class="room__id" id="roomId">{{ room_id }}</div>
+          <div class="room__id" id="roomId"><%= room_id %></div>
           <a class="room__link" id="shareLink" href="#">Abrir enlace</a>
         </div>
       </header>
@@ -27,15 +27,24 @@
         </div>
 
         <div class="status" id="statusText">Cargando sala...</div>
+        <div class="hint" id="matchScore"></div>
 
         <div class="players" id="playersBox">
-          <div class="player">
-            <div class="player__name">Jugador 1</div>
+          <div class="player" id="p1Card">
+            <div class="player__row">
+              <img class="player__avatar" id="p1Avatar" alt="Jugador 1" referrerpolicy="no-referrer" />
+              <div class="player__name" id="p1Name">Jugador 1</div>
+            </div>
             <div class="player__state" id="p1State">—</div>
+            <img class="player__throw" id="p1Throw" alt="Jugada Jugador 1" hidden />
           </div>
-          <div class="player">
-            <div class="player__name">Jugador 2</div>
+          <div class="player" id="p2Card">
+            <div class="player__row">
+              <img class="player__avatar" id="p2Avatar" alt="Jugador 2" referrerpolicy="no-referrer" />
+              <div class="player__name" id="p2Name">Jugador 2</div>
+            </div>
             <div class="player__state" id="p2State">—</div>
+            <img class="player__throw" id="p2Throw" alt="Jugada Jugador 2" hidden />
           </div>
         </div>
 
@@ -60,38 +69,29 @@
           <div class="result__big" id="resultBig">—</div>
           <div class="result__detail" id="resultDetail"></div>
         </section>
-      </section>
 
-      <footer class="footer">
-        <div class="share">
-          <div class="share__left">
-            <div class="hint">
-              Comparte este enlace para que entre el segundo jugador:
-              <span class="hint__mono" id="shareUrlText">—</span>
+        <section class="adminDash" id="duelAdminBox" hidden>
+          <div class="adminDash__title">Admin de la sala</div>
+          <div class="adminDash__row" style="grid-template-columns: 1fr 1fr;">
+            <div class="adminDash__box">
+              <div class="adminDash__label">Jugador 1</div>
+              <div class="hint" style="margin-top:10px">Elección: <span class="hint__mono" id="duelAdminP1Choice">—</span></div>
             </div>
-            <div class="share__actions">
-              <button class="btn btn--paper share__copy" id="copyBtn" type="button">Copiar enlace</button>
-              <div class="share__msg" id="copyMsg"></div>
-            </div>
-          </div>
-          <div class="qr">
-            <div class="qr__label">Escanea el QR</div>
-            <img class="qr__img" id="qrImg" alt="QR de la sala" />
-            <div class="qr__code">
-              Código:
-              <span class="qr__mono" id="roomCode">{{ room_id }}</span>
+            <div class="adminDash__box">
+              <div class="adminDash__label">Jugador 2</div>
+              <div class="hint" style="margin-top:10px">Elección: <span class="hint__mono" id="duelAdminP2Choice">—</span></div>
             </div>
           </div>
-        </div>
-      </footer>
+        </section>
+      </section>
     </main>
 
     <script>
-      window.__ROOM_ID__ = "{{ room_id }}";
-      window.__MODE__ = "{{ mode|default('duel') }}";
-      window.__MAX_PLAYERS__ = {{ max_players|default(2) }};
+      window.__ROOM_ID__ = "<%= room_id %>";
+      window.__MODE__ = "<%= (mode || 'duel') %>";
+      window.__MAX_PLAYERS__ = <%= (typeof max_players === 'number' ? max_players : 2) %>;
     </script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="/static/script.js"></script>
   </body>
 </html>
