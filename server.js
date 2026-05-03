@@ -411,6 +411,7 @@ const sidToRoom = new Map();
 const sidToMode = new Map();
 const inviteCodeToTournament = new Map();
 const LOBBY_ID = "LOBBY";
+const HACK_ID = "HACK";
 const lobbyCodeToRoom = new Map();
 const lobbyAdvanceQueue = new Map();
 const lobby = {
@@ -497,6 +498,54 @@ function lobbyPayload() {
     bracket_seeds: bracketSeeds,
     match_codes: matchCodes,
   };
+}
+
+function hackPayload() {
+  const list = Array.isArray(lobby.match_codes) ? lobby.match_codes : [];
+  return list.slice(0, 64).map((m) => {
+    const roomId = String((m && m.room_id) || "").trim();
+    const duelRoom = roomId ? rooms.get(roomId) : null;
+    const sids = duelRoom && Array.isArray(duelRoom.slot_sids) ? duelRoom.slot_sids : [null, null];
+    const profs = duelRoom && Array.isArray(duelRoom.slot_profiles) ? duelRoom.slot_profiles : [{}, {}];
+
+    const p1Handle =
+      normalizeHandle((profs[0] && profs[0].handle) || "") ||
+      normalizeHandle((m && m.p1_handle) || "") ||
+      "";
+    const p2Handle =
+      normalizeHandle((profs[1] && profs[1].handle) || "") ||
+      normalizeHandle((m && m.p2_handle) || "") ||
+      "";
+
+    const p1Choice = duelRoom && sids[0] ? String(duelRoom.choices.get(sids[0]) || "") : "";
+    const p2Choice = duelRoom && sids[1] ? String(duelRoom.choices.get(sids[1]) || "") : "";
+
+    return {
+      index: Number.isFinite(Number(m && m.index)) ? Number(m.index) : 0,
+      room_id: roomId,
+      p1_handle: p1Handle,
+      p2_handle: p2Handle,
+      p1_choice: p1Choice,
+      p2_choice: p2Choice,
+      state: duelRoom ? String(duelRoom.state || "") : "offline",
+      started: Boolean(duelRoom && duelRoom.started),
+      manual_start: Boolean(duelRoom && duelRoom.manual_start),
+      score: duelRoom
+        ? {
+            round: Number.isFinite(duelRoom.round_index) ? duelRoom.round_index + 1 : 1,
+            rounds_total: Number.isFinite(duelRoom.rounds_total) ? duelRoom.rounds_total : 3,
+            p1: Number.isFinite(duelRoom.p1_wins) ? duelRoom.p1_wins : 0,
+            p2: Number.isFinite(duelRoom.p2_wins) ? duelRoom.p2_wins : 0,
+          }
+        : { round: 1, rounds_total: 3, p1: 0, p2: 0 },
+    };
+  });
+}
+
+function emitHackState() {
+  try {
+    io.to(HACK_ID).emit("hack_state", { rooms: hackPayload(), ts: Date.now() });
+  } catch {}
 }
 
 function uniqueLobbyMatchCode() {
@@ -676,6 +725,7 @@ function broadcastRoomState(room) {
   io.to(room.room_id).emit("players_update", playersPayload(room));
   const sids = Array.isArray(room.slot_sids) ? room.slot_sids : [null, null];
   if (!sids[0] || !sids[1]) io.to(room.room_id).emit("status", { text: "Esperando jugador..." });
+  if (room && room.type === "duel" && lobbyMatchByRoomId(room.room_id)) emitHackState();
 }
 
 function lobbyMatchByRoomId(roomId) {
@@ -1046,6 +1096,7 @@ async function startCountdownIfReady(roomId) {
   room.state = "countdown";
   room.countdown_task_running = true;
   room.choices.clear();
+  if (lobbyMatchByRoomId(roomId)) emitHackState();
 
   try {
     io.to(roomId).emit("round_reset", {});
@@ -1065,6 +1116,7 @@ async function startCountdownIfReady(roomId) {
     }
     r.state = "playing";
     r.choices.clear();
+    if (lobbyMatchByRoomId(roomId)) emitHackState();
     io.to(roomId).emit("countdown", { seconds: 0 });
     io.to(roomId).emit("round_started", {});
     io.to(roomId).emit("status", { text: "Elige tu jugada" });
@@ -1168,6 +1220,11 @@ app.get("/perdiste", (req, res) => {
   return res.render("perdiste.html");
 });
 
+app.get("/hack", (req, res) => {
+  if (!isAdminLoggedIn(req)) return res.redirect(`/admin/login?next=${encodeURIComponent("/hack")}`);
+  return res.render("hack.html");
+});
+
 app.get("/lobby/admin", (req, res) => {
   if (!isAdminLoggedIn(req)) return res.redirect(`/admin/login?next=${encodeURIComponent("/lobby/admin")}`);
   res.type("html").send(
@@ -1205,6 +1262,7 @@ app.get("/lobby/admin", (req, res) => {
           <button class="btn btn--paper" id="lobbyEditDuelBtn" type="button">Editar sala</button>
           <button class="btn btn--paper" id="lobbyStartDuelsBtn" type="button">Iniciar salas</button>
           <button class="btn btn--paper" id="lobbyRoutesBtn" type="button">Rutas</button>
+          <button class="btn btn--paper" id="lobbyHackBtn" type="button">HACK</button>
         </div>
         <div class="status" id="statusText">Listo.</div>
 
@@ -1317,6 +1375,7 @@ app.get("/lobby/admin", (req, res) => {
             <a class="room__link" href="/bracket" target="_blank" rel="noreferrer">/bracket</a> · Llaves<br/>
             <a class="room__link" href="/premios" target="_blank" rel="noreferrer">/premios</a> · Ganadores / premio<br/>
             <a class="room__link" href="/perdiste" target="_blank" rel="noreferrer">/perdiste</a> · Pantalla perdedor<br/>
+            <a class="room__link" href="/hack" target="_blank" rel="noreferrer">/hack</a> · Ver elecciones en vivo<br/>
             <a class="room__link" href="/admin/login" target="_blank" rel="noreferrer">/admin/login</a> · Login admin
           </div>
         </div>
@@ -1326,6 +1385,7 @@ app.get("/lobby/admin", (req, res) => {
 /bracket
 /premios
 /perdiste
+/hack
 /admin/login
 /juego/ROOMID?h=@usuario
 /juego/ROOMID/admin</textarea>
@@ -1621,6 +1681,27 @@ io.on("connection", (socket) => {
         is_admin: mode === "lobby_admin",
       });
       socket.emit("lobby_state", lobbyPayload());
+      return;
+    }
+
+    if (mode === "hack") {
+      if (!isAdminLoggedInFromSocket(socket)) {
+        socket.emit("error_message", { text: "Admin no autenticado." });
+        socket.disconnect(true);
+        return;
+      }
+      sidToRoom.set(socket.id, HACK_ID);
+      sidToMode.set(socket.id, mode);
+      socket.join(HACK_ID);
+      socket.emit("joined", {
+        room_id: HACK_ID,
+        you_are: "HACK",
+        share_url: `${defaultBaseUrl}/lobby`,
+        qr_path: "",
+        mode,
+        is_admin: true,
+      });
+      socket.emit("hack_state", { rooms: hackPayload(), ts: Date.now() });
       return;
     }
 
@@ -2658,6 +2739,7 @@ io.on("connection", (socket) => {
         io.to(adminSid).emit("duel_admin_peek", { p1_choice: p1Choice, p2_choice: p2Choice });
       }
     }
+    if (lobbyMatchByRoomId(room.room_id)) emitHackState();
     if (room.choices.size < 2) {
       io.to(room.room_id).emit("status", { text: "Esperando la jugada del rival..." });
       return;

@@ -1750,3 +1750,125 @@ body{
   .actions .btn{min-height: 82px}
   .actions .btn::before{width: 40px; height: 40px}
 }
+
+.page--hack{
+  min-height: 100dvh;
+  background: radial-gradient(900px 420px at 10% 0%, rgba(110,243,255,.10), transparent 60%),
+    radial-gradient(720px 420px at 100% 0%, rgba(177,110,255,.10), transparent 60%),
+    #070a14;
+}
+.hackPanel{
+  width: min(1300px, calc(100% - 28px));
+  margin: 16px auto;
+}
+.hackHead{
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:12px;
+}
+.hackTitle{
+  font-weight: 1100;
+  letter-spacing: .08em;
+  font-size: 18px;
+}
+.hackSub{
+  color: var(--muted);
+  font-weight: 850;
+  font-size: 12px;
+}
+.hackGrid{
+  margin-top: 12px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.hackRoom{
+  border: 1px solid rgba(234,242,255,.12);
+  background: rgba(7,10,20,.26);
+  border-radius: 18px;
+  overflow:hidden;
+}
+.hackRoom__top{
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(234,242,255,.10);
+  background: rgba(234,242,255,.04);
+}
+.hackRoom__name{
+  font-weight: 1100;
+  letter-spacing: .06em;
+}
+.hackRoom__meta{
+  margin-top: 8px;
+  display:flex;
+  gap: 6px;
+  flex-wrap:wrap;
+}
+.hackPill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(234,242,255,.12);
+  background: rgba(234,242,255,.06);
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(234,242,255,.92);
+}
+.hackRoom__rid{
+  margin-top: 6px;
+  color: var(--muted);
+  font-weight: 850;
+  font-size: 11px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.hackRoom__body{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items:center;
+  padding: 12px;
+}
+.hackSide__name{
+  font-weight: 1000;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.hackSide__pick{
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(234,242,255,.14);
+  background: rgba(15,23,48,.30);
+  font-weight: 1100;
+  letter-spacing: .06em;
+  text-align:center;
+}
+.hackSide__pick--on{
+  border-style: solid;
+  border-color: rgba(110,243,255,.22);
+  background: rgba(110,243,255,.08);
+}
+.hackSide__score{
+  margin-top: 6px;
+  color: var(--muted);
+  font-weight: 900;
+  font-size: 12px;
+}
+.hackVs{
+  font-weight: 1100;
+  letter-spacing: .12em;
+  color: rgba(234,242,255,.70);
+}
+.hackEmpty{
+  color: var(--muted);
+  font-weight: 900;
+  padding: 14px 0;
+}
+@media (max-width: 980px){
+  .hackGrid{grid-template-columns:1fr}
+}

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HACK</title>
+    <link rel="stylesheet" href="/static/estilos.css" />
+  </head>
+  <body class="page--hack">
+    <main class="app app--hack">
+      <section class="panel hackPanel">
+        <div class="hackHead">
+          <div class="hackTitle">HACK</div>
+          <div class="hackSub" id="hackStatus">Conectando...</div>
+        </div>
+        <div class="hackGrid" id="hackGrid"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous" onerror="this.onerror=null;this.src='/socket.io/socket.io.js';"></script>
+    <script>
+      (function () {
+        const grid = document.getElementById("hackGrid");
+        const statusEl = document.getElementById("hackStatus");
+
+        function esc(s) {
+          return String(s || "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+        }
+
+        function fmtChoice(v) {
+          const c = String(v || "").trim().toLowerCase();
+          if (!c) return "—";
+          if (c === "piedra") return "PIEDRA";
+          if (c === "papel") return "PAPEL";
+          if (c === "tijera") return "TIJERA";
+          return String(v || "").toUpperCase();
+        }
+
+        const sock = window.io ? window.io({ transports: ["websocket", "polling"] }) : null;
+        if (!sock) return;
+
+        sock.on("connect", () => {
+          if (statusEl) statusEl.textContent = "Online";
+          sock.emit("join", { room_id: "LOBBY", mode: "hack" });
+        });
+
+        sock.on("disconnect", () => {
+          if (statusEl) statusEl.textContent = "Desconectado";
+        });
+
+        sock.on("error_message", (p) => {
+          if (statusEl && p && p.text) statusEl.textContent = String(p.text);
+        });
+
+        sock.on("hack_state", (payload) => {
+          const rooms = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
+          if (statusEl) statusEl.textContent = rooms.length ? `Salas: ${rooms.length}` : "Sin salas todavía.";
+          if (!grid) return;
+          grid.innerHTML = rooms.length
+            ? rooms
+                .map((r) => {
+                  const idx = Number.isFinite(Number(r && r.index)) ? Number(r.index) : 0;
+                  const rid = r && r.room_id ? String(r.room_id) : "";
+                  const p1 = r && r.p1_handle ? String(r.p1_handle) : "—";
+                  const p2 = r && r.p2_handle ? String(r.p2_handle) : "—";
+                  const c1 = fmtChoice(r && r.p1_choice);
+                  const c2 = fmtChoice(r && r.p2_choice);
+                  const st = r && r.state ? String(r.state) : "";
+                  const started = r && r.started ? "Sí" : "No";
+                  const manual = r && r.manual_start ? "Sí" : "No";
+                  const score = r && r.score ? r.score : {};
+                  const round = Number.isFinite(Number(score.round)) ? Number(score.round) : 1;
+                  const rt = Number.isFinite(Number(score.rounds_total)) ? Number(score.rounds_total) : 3;
+                  const s1 = Number.isFinite(Number(score.p1)) ? Number(score.p1) : 0;
+                  const s2 = Number.isFinite(Number(score.p2)) ? Number(score.p2) : 0;
+                  return `<div class="hackRoom">
+                    <div class="hackRoom__top">
+                      <div class="hackRoom__name">SALA ${idx + 1}</div>
+                      <div class="hackRoom__meta">
+                        <span class="hackPill">Estado: ${esc(st || "—")}</span>
+                        <span class="hackPill">Iniciada: ${esc(started)}</span>
+                        <span class="hackPill">Manual: ${esc(manual)}</span>
+                        <span class="hackPill">Ronda: ${round}/${rt}</span>
+                      </div>
+                      <div class="hackRoom__rid">${esc(rid)}</div>
+                    </div>
+                    <div class="hackRoom__body">
+                      <div class="hackSide">
+                        <div class="hackSide__name">${esc(p1)}</div>
+                        <div class="hackSide__pick ${c1 === "—" ? "" : "hackSide__pick--on"}">${esc(c1)}</div>
+                        <div class="hackSide__score">Marcador: ${s1}</div>
+                      </div>
+                      <div class="hackVs">VS</div>
+                      <div class="hackSide">
+                        <div class="hackSide__name">${esc(p2)}</div>
+                        <div class="hackSide__pick ${c2 === "—" ? "" : "hackSide__pick--on"}">${esc(c2)}</div>
+                        <div class="hackSide__score">Marcador: ${s2}</div>
+                      </div>
+                    </div>
+                  </div>`;
+                })
+                .join("")
+            : `<div class="hackEmpty">Sin salas.</div>`;
+        });
+      })();
+    </script>
+  </body>
+</html>

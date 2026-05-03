@@ -85,6 +85,7 @@ const duelConfigPrizeInput = $("duelConfigPrizeInput");
 const duelConfigSaveBtn = $("duelConfigSaveBtn");
 const duelConfigCloseBtn = $("duelConfigCloseBtn");
 const lobbyRoutesBtn = $("lobbyRoutesBtn");
+const lobbyHackBtn = $("lobbyHackBtn");
 const routesModal = $("routesModal");
 const routesText = $("routesText");
 const routesCopyBtn = $("routesCopyBtn");
@@ -1204,6 +1205,16 @@ if (lobbyRoutesBtn) {
   lobbyRoutesBtn.addEventListener("click", () => {
     setRoutesModalOpen(true);
     if (routesText) routesText.focus();
+  });
+}
+
+if (lobbyHackBtn) {
+  lobbyHackBtn.addEventListener("click", () => {
+    try {
+      window.open("/hack", "_blank", "noopener,noreferrer");
+    } catch {
+      window.location.href = "/hack";
+    }
   });
 }
 
