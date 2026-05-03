@@ -382,7 +382,7 @@ app.use("/static", express.static(path.join(__dirname, "static")));
 const sessionSecret =
   process.env.SESSION_SECRET ||
   process.env.SECRET_KEY ||
-  crypto.randomBytes(32).toString("hex");
+  "dev-insecure-secret-change-me";
 
 const sessionMiddleware = session({
   secret: sessionSecret,
