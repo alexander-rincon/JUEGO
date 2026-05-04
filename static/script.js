@@ -86,10 +86,16 @@ const duelConfigSaveBtn = $("duelConfigSaveBtn");
 const duelConfigCloseBtn = $("duelConfigCloseBtn");
 const lobbyRoutesBtn = $("lobbyRoutesBtn");
 const lobbyHackBtn = $("lobbyHackBtn");
+const lobbyBotsBtn = $("lobbyBotsBtn");
 const routesModal = $("routesModal");
 const routesText = $("routesText");
 const routesCopyBtn = $("routesCopyBtn");
 const routesCloseBtn = $("routesCloseBtn");
+const botsModal = $("botsModal");
+const botsFill2Btn = $("botsFill2Btn");
+const botsFill5Btn = $("botsFill5Btn");
+const botsFill10Btn = $("botsFill10Btn");
+const botsCloseBtn = $("botsCloseBtn");
 const lobbyOpenLiveModalBtn = $("lobbyOpenLiveModalBtn");
 const liveModal = $("liveModal");
 const lobbyLiveCloseBtn = $("lobbyLiveCloseBtn");
@@ -1170,6 +1176,11 @@ function setRoutesModalOpen(open) {
   routesModal.hidden = !open;
 }
 
+function setBotsModalOpen(open) {
+  if (!botsModal) return;
+  botsModal.hidden = !open;
+}
+
 if (duelConfigModal) {
   duelConfigModal.addEventListener("click", (e) => {
     const t = e && e.target ? e.target : null;
@@ -1183,6 +1194,14 @@ if (routesModal) {
     const t = e && e.target ? e.target : null;
     if (!t) return;
     if (t.dataset && t.dataset.close === "1") setRoutesModalOpen(false);
+  });
+}
+
+if (botsModal) {
+  botsModal.addEventListener("click", (e) => {
+    const t = e && e.target ? e.target : null;
+    if (!t) return;
+    if (t.dataset && t.dataset.close === "1") setBotsModalOpen(false);
   });
 }
 
@@ -1215,6 +1234,36 @@ if (lobbyHackBtn) {
     } catch {
       window.location.href = "/hack";
     }
+  });
+}
+
+if (lobbyBotsBtn) {
+  lobbyBotsBtn.addEventListener("click", () => setBotsModalOpen(true));
+}
+
+if (botsCloseBtn) {
+  botsCloseBtn.addEventListener("click", () => setBotsModalOpen(false));
+}
+
+if (botsFill2Btn) {
+  botsFill2Btn.addEventListener("click", () => {
+    if (!IS_LOBBY) return;
+    socket.emit("lobby_fill_bots", { rooms_count: 2 });
+    setBotsModalOpen(false);
+  });
+}
+if (botsFill5Btn) {
+  botsFill5Btn.addEventListener("click", () => {
+    if (!IS_LOBBY) return;
+    socket.emit("lobby_fill_bots", { rooms_count: 5 });
+    setBotsModalOpen(false);
+  });
+}
+if (botsFill10Btn) {
+  botsFill10Btn.addEventListener("click", () => {
+    if (!IS_LOBBY) return;
+    socket.emit("lobby_fill_bots", { rooms_count: 10 });
+    setBotsModalOpen(false);
   });
 }
 

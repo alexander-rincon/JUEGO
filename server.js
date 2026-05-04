@@ -412,6 +412,40 @@ const sidToMode = new Map();
 const inviteCodeToTournament = new Map();
 const LOBBY_ID = "LOBBY";
 const HACK_ID = "HACK";
+const BOT_PREFIX = "@BOT_";
+const botHandles = new Set();
+const BOT_NAMES = [
+  "Juan",
+  "Pedro",
+  "Luis",
+  "Carlos",
+  "Diego",
+  "Andres",
+  "Miguel",
+  "David",
+  "Jorge",
+  "Kevin",
+  "Santiago",
+  "Mateo",
+  "Sebastian",
+  "Daniel",
+  "Jose",
+  "Camilo",
+  "Nicolas",
+  "Felipe",
+  "Julian",
+  "Samuel",
+  "Maria",
+  "Sofia",
+  "Valentina",
+  "Camila",
+  "Daniela",
+  "Paula",
+  "Laura",
+  "Sara",
+  "Andrea",
+  "Carolina",
+];
 const lobbyCodeToRoom = new Map();
 const lobbyAdvanceQueue = new Map();
 const lobby = {
@@ -546,6 +580,59 @@ function emitHackState() {
   try {
     io.to(HACK_ID).emit("hack_state", { rooms: hackPayload(), ts: Date.now() });
   } catch {}
+}
+
+function isBotHandle(handle) {
+  const h = normalizeHandle(handle);
+  if (!h) return false;
+  if (botHandles.has(h)) return true;
+  return Boolean(h.toUpperCase().startsWith(BOT_PREFIX));
+}
+
+function botSidForHandle(handle) {
+  const h = normalizeHandle(handle);
+  return `BOT:${h || "BOT"}`;
+}
+
+function randomRpsChoice() {
+  const r = crypto.randomInt(3);
+  return r === 0 ? "piedra" : r === 1 ? "papel" : "tijera";
+}
+
+function duelClearBotTimers(room) {
+  if (!room || room.type !== "duel") return;
+  const timers = Array.isArray(room.bot_choice_timers) ? room.bot_choice_timers : [];
+  for (const t of timers) {
+    try {
+      clearTimeout(t);
+    } catch {}
+  }
+  room.bot_choice_timers = [];
+}
+
+function duelScheduleBotChoices(roomId) {
+  const room = rooms.get(String(roomId || "").trim());
+  if (!room || room.type !== "duel") return;
+  if (room.state !== "playing") return;
+  const sids = Array.isArray(room.slot_sids) ? room.slot_sids : [null, null];
+  const battleSeconds = Number.isFinite(room.battle_seconds) ? room.battle_seconds : 20;
+  const maxDelayMs = Math.max(500, Math.min(3500, Math.max(1, battleSeconds - 1) * 1000));
+  duelClearBotTimers(room);
+  for (const sid of sids) {
+    if (!sid || typeof sid !== "string" || !sid.startsWith("BOT:")) continue;
+    const delay = crypto.randomInt(1, Math.max(2, Math.floor(maxDelayMs)));
+    const timerId = setTimeout(() => {
+      const r = rooms.get(String(roomId || "").trim());
+      if (!r || r.type !== "duel") return;
+      if (r.state !== "playing") return;
+      if (!r.choices || !(r.choices instanceof Map)) return;
+      if (r.choices.has(sid)) return;
+      r.choices.set(sid, randomRpsChoice());
+      if (lobbyMatchByRoomId(r.room_id)) emitHackState();
+    }, delay);
+    if (!Array.isArray(room.bot_choice_timers)) room.bot_choice_timers = [];
+    room.bot_choice_timers.push(timerId);
+  }
 }
 
 function uniqueLobbyMatchCode() {
@@ -1095,6 +1182,7 @@ async function startCountdownIfReady(roomId) {
   if (roundIndex >= roundsTotal) return;
   room.state = "countdown";
   room.countdown_task_running = true;
+  duelClearBotTimers(room);
   room.choices.clear();
   if (lobbyMatchByRoomId(roomId)) emitHackState();
 
@@ -1121,6 +1209,7 @@ async function startCountdownIfReady(roomId) {
     io.to(roomId).emit("round_started", {});
     io.to(roomId).emit("status", { text: "Elige tu jugada" });
     const duelSeconds = Number.isFinite(r.battle_seconds) ? r.battle_seconds : (Number.parseInt(process.env.DUEL_BATTLE_SECONDS || "20", 10) || 20);
+    duelScheduleBotChoices(roomId);
     duelRunPickTimer(roomId, duelSeconds);
   } finally {
     const r = rooms.get(roomId);
@@ -1263,6 +1352,7 @@ app.get("/lobby/admin", (req, res) => {
           <button class="btn btn--paper" id="lobbyStartDuelsBtn" type="button">Iniciar salas</button>
           <button class="btn btn--paper" id="lobbyRoutesBtn" type="button">Rutas</button>
           <button class="btn btn--paper" id="lobbyHackBtn" type="button">HACK</button>
+          <button class="btn btn--paper" id="lobbyBotsBtn" type="button">Bots</button>
         </div>
         <div class="status" id="statusText">Listo.</div>
 
@@ -1393,6 +1483,21 @@ app.get("/lobby/admin", (req, res) => {
           <button class="btn btn--paper" id="routesCopyBtn" type="button">Copiar</button>
           <button class="btn btn--rock" id="routesCloseBtn" type="button">Cerrar</button>
         </div>
+      </div>
+    </div>
+
+    <div class="modal" id="botsModal" hidden>
+      <div class="modal__backdrop" data-close="1"></div>
+      <div class="modal__card" role="dialog" aria-modal="true" style="width:min(560px,100%);">
+        <div class="modal__title">Bots</div>
+        <div class="modal__sub">Llenar salas vacías con bots</div>
+        <div class="panel__row" style="margin-top:12px">
+          <button class="btn btn--paper" id="botsFill2Btn" type="button">Llenar x2</button>
+          <button class="btn btn--paper" id="botsFill5Btn" type="button">Llenar x5</button>
+          <button class="btn btn--paper" id="botsFill10Btn" type="button">Llenar x10</button>
+          <button class="btn btn--rock" id="botsCloseBtn" type="button">Cerrar</button>
+        </div>
+        <div class="hint" style="margin-top:10px">Crea bots, empareja y genera códigos automáticamente.</div>
       </div>
     </div>
 
@@ -2235,6 +2340,7 @@ io.on("connection", (socket) => {
     lobby.bracket_seeds = [];
     lobby.match_codes = [];
     lobbyCodeToRoom.clear();
+    botHandles.clear();
     io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
     io.to(LOBBY_ID).emit("lobby_status", { text: "Lobby reiniciado" });
   });
@@ -2307,6 +2413,146 @@ io.on("connection", (socket) => {
 
     io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
     io.to(LOBBY_ID).emit("lobby_status", { text: `Salas llenas y códigos listos: ${lobby.match_codes.length}` });
+  });
+
+  socket.on("lobby_fill_bots", (data) => {
+    const roomId = sidToRoom.get(socket.id);
+    if (roomId !== LOBBY_ID) {
+      socket.emit("error_message", { text: "No estás en el lobby." });
+      return;
+    }
+    if (!isAdminLoggedInFromSocket(socket)) {
+      socket.emit("error_message", { text: "Solo admin puede usar bots." });
+      return;
+    }
+
+    const roomsTargetRaw = Number.parseInt(String((data && data.rooms_count) || "0"), 10);
+    const roomsTarget = roomsTargetRaw === 2 || roomsTargetRaw === 5 || roomsTargetRaw === 10 ? roomsTargetRaw : 2;
+    const needPlayers = roomsTarget * 2;
+
+    const candidates = [];
+    for (const hRaw of lobby.approved) {
+      const h = normalizeHandle(hRaw);
+      if (!h) continue;
+      if (lobby.kicked.has(h)) continue;
+      const p = lobby.participants.get(h);
+      if (!p) continue;
+      candidates.push({ handle: h, avatar_url: String(p.avatar_url || "").trim(), total_value: Number(p.total_value) || 0 });
+    }
+
+    let botCounter = botHandles.size + 1;
+    const candSet = new Set(candidates.map((c) => String(c.handle || "").toLowerCase()));
+
+    const allocBotHandle = () => {
+      const idx = botCounter - 1;
+      const baseName = BOT_NAMES[idx % BOT_NAMES.length] || "Bot";
+      const cycle = Math.floor(idx / BOT_NAMES.length) + 1;
+      const base = normalizeHandle(baseName);
+      let attempt = 0;
+      while (attempt < 2000) {
+        const suffix = cycle + attempt;
+        const cand1 = suffix === 1 ? base : `${base}${suffix}`;
+        if (!candSet.has(cand1.toLowerCase()) && !lobby.participants.has(cand1)) return cand1;
+        const cand2 = suffix === 1 ? `${base}BOT` : `${base}BOT${suffix}`;
+        if (!candSet.has(cand2.toLowerCase()) && !lobby.participants.has(cand2)) return cand2;
+        attempt += 1;
+      }
+      return `${BOT_PREFIX}${String(botCounter).padStart(3, "0")}`;
+    };
+
+    while (candidates.length < needPlayers) {
+      const h = allocBotHandle();
+      botCounter += 1;
+      if (lobby.participants.has(h) && !botHandles.has(h)) continue;
+      if (!lobby.participants.has(h)) {
+        lobby.participants.set(h, { handle: h, avatar_url: "/static/rps/INI1.png", total_value: 0, gifts: [] });
+      }
+      botHandles.add(h);
+      lobby.approved.add(h);
+      const p = lobby.participants.get(h);
+      candidates.push({ handle: h, avatar_url: String((p && p.avatar_url) || "/static/rps/INI1.png").trim(), total_value: 0 });
+      candSet.add(String(h || "").toLowerCase());
+    }
+
+    for (let i = candidates.length - 1; i > 0; i -= 1) {
+      const j = crypto.randomInt(i + 1);
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+
+    let size = 8;
+    while (size < needPlayers) size *= 2;
+    size = Math.max(8, Math.min(32, size));
+
+    const seeds = candidates.slice(0, size).map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
+    while (seeds.length < size) seeds.push({ handle: "", avatar_url: "" });
+
+    lobby.match_codes = [];
+    lobbyCodeToRoom.clear();
+    lobby.bracket_size = size;
+    lobby.bracket_seeds = seeds.slice(0, size);
+
+    const pairsAll = lobbyPairsFromSeeds();
+    const pairs = pairsAll.filter((p) => p && p.p1_handle && p.p2_handle).slice(0, roomsTarget);
+    if (!pairs.length) {
+      io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
+      io.to(LOBBY_ID).emit("lobby_status", { text: "Bots listos. Falta emparejar." });
+      return;
+    }
+
+    const maxPairs = Math.min(16, pairs.length);
+    for (let i = 0; i < maxPairs; i += 1) {
+      const pair = pairs[i];
+      let duelRoomId = generateRoomId();
+      while (rooms.has(duelRoomId)) duelRoomId = generateRoomId();
+      const duelRoom = getOrCreateDuelRoom(duelRoomId);
+      duelRoom.subtree_size = 1;
+      duelRoom.manual_start = true;
+      duelRoom.started = false;
+      duelRoom.slot_profiles = [
+        { handle: normalizeHandle(pair.p1_handle || ""), avatar_url: String(pair.p1_avatar || "").trim() },
+        { handle: normalizeHandle(pair.p2_handle || ""), avatar_url: String(pair.p2_avatar || "").trim() },
+      ];
+      const p1IsBot = isBotHandle(duelRoom.slot_profiles[0] && duelRoom.slot_profiles[0].handle);
+      const p2IsBot = isBotHandle(duelRoom.slot_profiles[1] && duelRoom.slot_profiles[1].handle);
+      duelRoom.slot_sids = [
+        p1IsBot ? botSidForHandle(duelRoom.slot_profiles[0].handle) : null,
+        p2IsBot ? botSidForHandle(duelRoom.slot_profiles[1].handle) : null,
+      ];
+      duelClearBotTimers(duelRoom);
+      duelRoom.choices.clear();
+      duelRoom.state = "waiting";
+      duelRoom.rounds_total = 3;
+      duelRoom.round_index = 0;
+      duelRoom.p1_wins = 0;
+      duelRoom.p2_wins = 0;
+      if (Number.isFinite(lobby.duel_battle_seconds)) duelRoom.battle_seconds = lobby.duel_battle_seconds;
+      if (Number.isFinite(lobby.duel_countdown_seconds)) duelRoom.countdown_seconds = lobby.duel_countdown_seconds;
+      const code = uniqueLobbyMatchCode();
+      lobbyCodeToRoom.set(code, duelRoomId);
+      lobby.match_codes.push({
+        index: i + 1,
+        code,
+        room_id: duelRoomId,
+        p1_handle: normalizeHandle(pair.p1_handle || ""),
+        p1_avatar: String(pair.p1_avatar || "").trim(),
+        p2_handle: normalizeHandle(pair.p2_handle || ""),
+        p2_avatar: String(pair.p2_avatar || "").trim(),
+        subtree_size: 1,
+        code_used: false,
+        p1_score: 0,
+        p2_score: 0,
+        round: 0,
+        rounds_total: 3,
+        finished: false,
+        winner_handle: "",
+        loser_handle: "",
+        history: [],
+      });
+    }
+
+    io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
+    io.to(LOBBY_ID).emit("lobby_status", { text: `Bots listos: salas creadas ${lobby.match_codes.length}` });
+    emitHackState();
   });
 
   socket.on("lobby_start_ready_duels", () => {
