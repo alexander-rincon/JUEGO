@@ -594,6 +594,20 @@ function botSidForHandle(handle) {
   return `BOT:${h || "BOT"}`;
 }
 
+function duelEnsureBotSids(duelRoom) {
+  if (!duelRoom || duelRoom.type !== "duel") return;
+  const profs = Array.isArray(duelRoom.slot_profiles) ? duelRoom.slot_profiles : [{}, {}];
+  const sids = Array.isArray(duelRoom.slot_sids) ? duelRoom.slot_sids : [null, null];
+  for (let i = 0; i < 2; i += 1) {
+    const h = normalizeHandle((profs[i] && profs[i].handle) || "");
+    const isBot = isBotHandle(h);
+    const sid = sids[i];
+    if (isBot && !sid) sids[i] = botSidForHandle(h);
+    if (!isBot && typeof sid === "string" && sid.startsWith("BOT:")) sids[i] = null;
+  }
+  duelRoom.slot_sids = sids;
+}
+
 function randomRpsChoice() {
   const r = crypto.randomInt(3);
   return r === 0 ? "piedra" : r === 1 ? "papel" : "tijera";
@@ -912,15 +926,19 @@ function lobbyTryDeliverAdvance(targetIndex, targetSubtree) {
     else break;
 
     duelAssignProfileToSlot(duelRoom, slot, profile);
+    duelEnsureBotSids(duelRoom);
     const nowProfs = Array.isArray(duelRoom.slot_profiles) ? duelRoom.slot_profiles : [{}, {}];
     lobbySetMatchPlayers(targetIndex, nowProfs[0] || {}, nowProfs[1] || {});
+    broadcastRoomState(duelRoom);
 
-    io.to(sid).emit("duel_redirect", { url: `/juego/${encodeURIComponent(String(mc.room_id))}?h=${encodeURIComponent(h)}` });
-    setTimeout(() => {
-      try {
-        io.sockets.sockets.get(sid)?.disconnect(true);
-      } catch {}
-    }, 300);
+    if (!String(sid).startsWith("BOT:")) {
+      io.to(sid).emit("duel_redirect", { url: `/juego/${encodeURIComponent(String(mc.room_id))}?h=${encodeURIComponent(h)}` });
+      setTimeout(() => {
+        try {
+          io.sockets.sockets.get(sid)?.disconnect(true);
+        } catch {}
+      }, 300);
+    }
     break;
   }
 
@@ -1169,6 +1187,7 @@ async function duelRunPickTimer(roomId, battleSeconds) {
 async function startCountdownIfReady(roomId) {
   const room = rooms.get(roomId);
   if (!room || room.type !== "duel") return;
+  duelEnsureBotSids(room);
   const sids = Array.isArray(room.slot_sids) ? room.slot_sids : [null, null];
   if (!sids[0] || !sids[1]) return;
   if (room.manual_start && !room.started) {
@@ -2574,6 +2593,7 @@ io.on("connection", (socket) => {
       if (!r || r.type !== "duel") continue;
       if (!r.manual_start) continue;
       if (r.started) continue;
+      duelEnsureBotSids(r);
       const sids = Array.isArray(r.slot_sids) ? r.slot_sids : [null, null];
       if (!sids[0] || !sids[1]) continue;
       const roundsTotal = Number.isFinite(r.rounds_total) ? r.rounds_total : 3;
