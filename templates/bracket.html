@@ -11,27 +11,21 @@
       <header class="top">
         <div class="brand">
           <h1 class="title">Bracket</h1>
-          <p class="subtitle">Cambia el tamaño del torneo</p>
+          <p class="subtitle">8 cuadros · 2 salas por cuadro (parejas)</p>
         </div>
         <div class="bracketControls">
           <button class="btn btn--paper" id="bracketX2" type="button">X2</button>
           <button class="btn btn--paper" id="bracketX5" type="button">X5</button>
           <button class="btn btn--paper" id="bracketX10" type="button">X10</button>
-          <button class="btn btn--paper" id="bracketPrev" type="button">Volver</button>
-          <button class="btn btn--rock" id="bracketNext" type="button">Siguiente</button>
-          <button class="btn btn--rock" id="bracketClear" type="button">Limpiar</button>
         </div>
       </header>
 
       <section class="panel">
         <div class="panel__row" style="align-items:center">
-          <div class="status" id="bracketStatus" style="margin-top:0">Mostrando: 32</div>
+          <div class="status" id="bracketStatus" style="margin-top:0">Cargando...</div>
           <div class="pill pill--accent" id="bracketPrizePill">Premio: —</div>
         </div>
-        <div class="bracketWrap" id="bracketWrap">
-          <svg class="bracketLines" id="bracketLines" aria-hidden="true"></svg>
-          <div class="bracketInner" id="bracketInner"></div>
-        </div>
+        <div class="brTablesGrid" id="brTablesGrid"></div>
       </section>
     </main>
 
@@ -40,82 +34,22 @@
       (function () {
         const statusEl = document.getElementById("bracketStatus");
         const prizePill = document.getElementById("bracketPrizePill");
-        const wrap = document.getElementById("bracketWrap");
-        const inner = document.getElementById("bracketInner");
-        const svg = document.getElementById("bracketLines");
+        const grid = document.getElementById("brTablesGrid");
 
         const BTN_8 = document.getElementById("bracketX2");
         const BTN_16 = document.getElementById("bracketX5");
         const BTN_32 = document.getElementById("bracketX10");
-        const BTN_NEXT = document.getElementById("bracketNext");
-        const BTN_PREV = document.getElementById("bracketPrev");
-        const BTN_CLEAR = document.getElementById("bracketClear");
-
-        const BOX_H = 62;
-        const BASE_GAP = 14;
-        const PAD_X = 18;
         let currentSize = 32;
-        let currentLeftRounds = 0;
-        let currentRightRounds = 0;
-        let currentStage = 0;
-        let currentSeeds = [];
         let currentMatchCodes = [];
+        let liveByRoomId = new Map();
 
-        function el(tag, cls) {
-          const e = document.createElement(tag);
-          if (cls) e.className = cls;
-          return e;
-        }
-
-        function roundLayouts(roundCount) {
-          const gaps = [];
-          const pads = [];
-          let g = BASE_GAP;
-          for (let r = 0; r < roundCount; r += 1) {
-            gaps.push(g);
-            pads.push(r === 0 ? 0 : Math.round((BOX_H + gaps[r - 1]) / 2));
-            if (r > 0) g = BOX_H + 2 * gaps[r - 1];
-            else g = BOX_H + 2 * g;
-          }
-          return { gaps, pads };
-        }
-
-        function matchBox(side, round, matchIdx, aText, bText, scoreText, aClass, bClass) {
-          const m = el("div", "brMatch");
-          m.dataset.side = side;
-          m.dataset.round = String(round);
-          m.dataset.match = String(matchIdx);
-          const a = el("div", aClass ? `brSlot ${aClass}` : "brSlot");
-          const b = el("div", bClass ? `brSlot ${bClass}` : "brSlot");
-          a.innerHTML = aText || "—";
-          b.innerHTML = bText || "—";
-          m.appendChild(a);
-          m.appendChild(b);
-          if (scoreText) {
-            const s = el("div", "brScore");
-            s.textContent = scoreText;
-            m.appendChild(s);
-          }
-          return m;
-        }
-
-        function escapeHtml(s) {
+        function esc(s) {
           return String(s || "")
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
-        }
-
-        function slotHtml(name, avatarUrl) {
-          const n = String(name || "").trim();
-          const url = String(avatarUrl || "").trim() || "/static/rps/INI1.png";
-          const label = escapeHtml(n || "—");
-          return `<div class="brSlotInner">
-            <img class="brAvatar" src="${escapeHtml(url)}" alt="${label}" loading="lazy" referrerpolicy="no-referrer" />
-            <div class="brName">${label}</div>
-          </div>`;
         }
 
         function normalizeHandle(v) {
@@ -129,456 +63,203 @@
           return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
         }
 
-        function recordForStage(mc, requiredSubtree) {
-          if (!mc) return null;
-          const req = Number(requiredSubtree);
-          const sub = mc && Number.isFinite(Number(mc.subtree_size)) ? Number(mc.subtree_size) : 1;
-          if (sub === req) return mc;
-          const hist = mc && Array.isArray(mc.history) ? mc.history : [];
-          for (let i = hist.length - 1; i >= 0; i -= 1) {
-            const h = hist[i];
-            const hs = h && Number.isFinite(Number(h.subtree_size)) ? Number(h.subtree_size) : 0;
-            if (hs === req) return h;
-          }
-          return null;
-        }
-
-        function applyDuelResults(totalSize, seeds, matchCodes) {
-          const sideSize = totalSize / 2;
-          const firstRoundMatches = sideSize / 2;
-          const toMap = new Map();
-          for (const m of Array.isArray(matchCodes) ? matchCodes : []) {
-            const idx = Number(m && m.index);
-            if (!Number.isFinite(idx)) continue;
-            toMap.set(idx, m);
-          }
-
-          for (const side of ["left", "right"]) {
-            const winners = Array.from({ length: firstRoundMatches }, () => null);
-            for (let m = 0; m < firstRoundMatches; m += 1) {
-              const matchIndex = side === "left" ? (m + 1) : (firstRoundMatches + m + 1);
-              const mc = toMap.get(matchIndex) || null;
-
-              const base = side === "left" ? 1 : sideSize + 1;
-              const p1Seed = base + m * 2;
-              const p2Seed = base + m * 2 + 1;
-              const s1 = seeds[p1Seed - 1] || {};
-              const s2 = seeds[p2Seed - 1] || {};
-              const p1 = { handle: normalizeHandle(s1.handle || ""), avatar_url: String(s1.avatar_url || "").trim() };
-              const p2 = { handle: normalizeHandle(s2.handle || ""), avatar_url: String(s2.avatar_url || "").trim() };
-
-              const matchEl = inner.querySelector(`[data-side="${side}"][data-round="0"][data-match="${m}"]`);
-              const slots = matchEl ? matchEl.querySelectorAll(".brSlot") : null;
-              const sA = slots && slots[0] ? slots[0] : null;
-              const sB = slots && slots[1] ? slots[1] : null;
-              if (sA) sA.classList.remove("brSlot--winner", "brSlot--loser");
-              if (sB) sB.classList.remove("brSlot--winner", "brSlot--loser");
-
-              const finished = Boolean(mc && mc.finished);
-              const winnerH = finished ? normalizeHandle(mc.winner_handle || "") : "";
-              if (!winnerH) continue;
-
-              const p1IsWinner = winnerH && winnerH === p1.handle;
-              const p2IsWinner = winnerH && winnerH === p2.handle;
-              if (!p1IsWinner && !p2IsWinner) continue;
-
-              if (p1IsWinner) {
-                winners[m] = p1;
-                if (sA) sA.classList.add("brSlot--winner");
-                if (sB) sB.classList.add("brSlot--loser");
-              } else {
-                winners[m] = p2;
-                if (sB) sB.classList.add("brSlot--winner");
-                if (sA) sA.classList.add("brSlot--loser");
-              }
-            }
-
-            const rounds = Math.log2(sideSize);
-            if (rounds < 2) continue;
-
-            const parentCount = firstRoundMatches / 2;
-            for (let pm = 0; pm < parentCount; pm += 1) {
-              const matchEl = inner.querySelector(`[data-side="${side}"][data-round="1"][data-match="${pm}"]`);
-              const slots = matchEl ? matchEl.querySelectorAll(".brSlot") : null;
-              const sA = slots && slots[0] ? slots[0] : null;
-              const sB = slots && slots[1] ? slots[1] : null;
-              const w1 = winners[pm * 2];
-              const w2 = winners[pm * 2 + 1];
-              if (sA) sA.innerHTML = w1 ? slotHtml(w1.handle, w1.avatar_url) : slotHtml("—", "");
-              if (sB) sB.innerHTML = w2 ? slotHtml(w2.handle, w2.avatar_url) : slotHtml("—", "");
-              if (sA) sA.classList.remove("brSlot--winner", "brSlot--loser");
-              if (sB) sB.classList.remove("brSlot--winner", "brSlot--loser");
-            }
-          }
-        }
-
-        function buildSide(side, totalSize, seeds, matchCodes) {
-          const sideSize = totalSize / 2;
-          const rounds = Math.log2(sideSize);
-          const { gaps, pads } = roundLayouts(rounds);
-          const sideEl = el("div", `brSide brSide--${side}`);
-          const roundBase = side === "left" ? 1 : (sideSize / 2 + 1);
-
-          for (let r = 0; r < rounds; r += 1) {
-            const col = el("div", "brCol");
-            col.style.gap = `${gaps[r]}px`;
-            col.style.paddingTop = `${pads[r]}px`;
-            col.dataset.side = side;
-            col.dataset.round = String(r);
-
-            const matchCount = sideSize / Math.pow(2, r + 1);
-            for (let m = 0; m < matchCount; m += 1) {
-              const matchIndex = roundBase + m * Math.pow(2, r);
-              const mc = Array.isArray(matchCodes) ? matchCodes.find((x) => Number(x && x.index) === matchIndex) : null;
-              const requiredSub = Math.pow(2, r);
-              const rec = recordForStage(mc, requiredSub);
-              const rNow = rec && Number.isFinite(rec.round) ? rec.round : 0;
-              const rTot = rec && Number.isFinite(rec.rounds_total) ? rec.rounds_total : 3;
-              const sc1 = rec && Number.isFinite(rec.p1_score) ? rec.p1_score : 0;
-              const sc2 = rec && Number.isFinite(rec.p2_score) ? rec.p2_score : 0;
-              const scoreText = rNow > 0 ? `Marcador ${sc1}-${sc2} · R${rNow}/${rTot}` : (rec && rec.finished ? `Marcador ${sc1}-${sc2}` : "");
-
-              let n1 = "—";
-              let n2 = "—";
-              let a1 = "/static/rps/INI1.png";
-              let a2 = "/static/rps/INI1.png";
-              if (r === 0) {
-                const baseSeed = side === "left" ? 1 : sideSize + 1;
-                const p1 = baseSeed + m * 2;
-                const p2 = baseSeed + m * 2 + 1;
-                const s1 = seeds[p1 - 1] || null;
-                const s2 = seeds[p2 - 1] || null;
-                n1 = s1 && s1.handle ? s1.handle : `@jugador${p1}`;
-                n2 = s2 && s2.handle ? s2.handle : `@jugador${p2}`;
-                a1 = s1 && s1.avatar_url ? s1.avatar_url : "/static/rps/INI1.png";
-                a2 = s2 && s2.avatar_url ? s2.avatar_url : "/static/rps/INI1.png";
-              } else if (rec) {
-                n1 = rec.p1_handle ? String(rec.p1_handle) : "—";
-                n2 = rec.p2_handle ? String(rec.p2_handle) : "—";
-                a1 = rec.p1_avatar ? String(rec.p1_avatar) : "/static/rps/INI1.png";
-                a2 = rec.p2_avatar ? String(rec.p2_avatar) : "/static/rps/INI1.png";
-              }
-
-              const win = rec && rec.finished && rec.winner_handle ? normalizeHandle(rec.winner_handle) : "";
-              const lose = rec && rec.finished && rec.loser_handle ? normalizeHandle(rec.loser_handle) : "";
-              const aClass = win && normalizeHandle(n1) === win ? "brSlot--winner" : (lose && normalizeHandle(n1) === lose ? "brSlot--loser" : "");
-              const bClass = win && normalizeHandle(n2) === win ? "brSlot--winner" : (lose && normalizeHandle(n2) === lose ? "brSlot--loser" : "");
-
-                col.appendChild(
-                  matchBox(
-                    side,
-                    r,
-                    m,
-                    slotHtml(n1, a1),
-                    slotHtml(n2, a2),
-                    scoreText,
-                    aClass,
-                    bClass,
-                  ),
-                );
-            }
-            sideEl.appendChild(col);
-          }
-          return { el: sideEl, rounds };
-        }
-
-        function isVisible(node) {
-          return Boolean(node && node.offsetParent);
-        }
-
-        function pointForMatch(m, where) {
-          const wrapRect = wrap.getBoundingClientRect();
-          const r = m.getBoundingClientRect();
-          const xLeft = r.left - wrapRect.left;
-          const xRight = r.right - wrapRect.left;
-          const yMid = r.top - wrapRect.top + r.height / 2;
-          if (where === "in_left") return { x: xLeft, y: yMid };
-          if (where === "in_right") return { x: xRight, y: yMid };
-          if (where === "out_left") return { x: xLeft, y: yMid };
-          return { x: xRight, y: yMid };
-        }
-
-        function drawPath(x1, y1, x2, y2, dir) {
-          const pad = PAD_X;
-          const midX = dir === "to_right" ? Math.min(x1 + pad, x2 - pad) : Math.max(x1 - pad, x2 + pad);
-          const d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
-          const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          p.setAttribute("d", d);
-          p.setAttribute("class", "brPath");
-          return p;
-        }
-
-        function rebuildLines(totalSize, leftRounds, rightRounds) {
-          while (svg.firstChild) svg.removeChild(svg.firstChild);
-          const w = wrap.clientWidth;
-          const h = wrap.clientHeight;
-          svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-          svg.setAttribute("width", String(w));
-          svg.setAttribute("height", String(h));
-
-          const sideSize = totalSize / 2;
-          const rounds = Math.log2(sideSize);
-
-          for (let r = 0; r < rounds - 1; r += 1) {
-            const childCount = sideSize / Math.pow(2, r + 1);
-            const parentRound = r + 1;
-            const parentCount = sideSize / Math.pow(2, parentRound + 1);
-            for (let pIdx = 0; pIdx < parentCount; pIdx += 1) {
-              const cA = pIdx * 2;
-              const cB = pIdx * 2 + 1;
-
-              const leftChildA = inner.querySelector(`[data-side="left"][data-round="${r}"][data-match="${cA}"]`);
-              const leftChildB = inner.querySelector(`[data-side="left"][data-round="${r}"][data-match="${cB}"]`);
-              const leftParent = inner.querySelector(`[data-side="left"][data-round="${parentRound}"][data-match="${pIdx}"]`);
-
-              if (isVisible(leftChildA) && isVisible(leftParent)) {
-                const aOut = pointForMatch(leftChildA, "out_right");
-                const pIn = pointForMatch(leftParent, "in_left");
-                svg.appendChild(drawPath(aOut.x, aOut.y, pIn.x, pIn.y, "to_right"));
-              }
-              if (isVisible(leftChildB) && isVisible(leftParent)) {
-                const bOut = pointForMatch(leftChildB, "out_right");
-                const pIn = pointForMatch(leftParent, "in_left");
-                svg.appendChild(drawPath(bOut.x, bOut.y, pIn.x, pIn.y, "to_right"));
-              }
-
-              const rightChildA = inner.querySelector(`[data-side="right"][data-round="${r}"][data-match="${cA}"]`);
-              const rightChildB = inner.querySelector(`[data-side="right"][data-round="${r}"][data-match="${cB}"]`);
-              const rightParent = inner.querySelector(`[data-side="right"][data-round="${parentRound}"][data-match="${pIdx}"]`);
-
-              if (isVisible(rightChildA) && isVisible(rightParent)) {
-                const aOut = pointForMatch(rightChildA, "out_left");
-                const pIn = pointForMatch(rightParent, "in_right");
-                svg.appendChild(drawPath(aOut.x, aOut.y, pIn.x, pIn.y, "to_left"));
-              }
-              if (isVisible(rightChildB) && isVisible(rightParent)) {
-                const bOut = pointForMatch(rightChildB, "out_left");
-                const pIn = pointForMatch(rightParent, "in_right");
-                svg.appendChild(drawPath(bOut.x, bOut.y, pIn.x, pIn.y, "to_left"));
-              }
-            }
-          }
-
-          const leftFinal = inner.querySelector(`[data-side="left"][data-round="${leftRounds - 1}"][data-match="0"]`);
-          const rightFinal = inner.querySelector(`[data-side="right"][data-round="${rightRounds - 1}"][data-match="0"]`);
-          const center = inner.querySelector(`[data-side="center"][data-round="0"][data-match="0"]`);
-          if (isVisible(leftFinal) && isVisible(center)) {
-            const aOut = pointForMatch(leftFinal, "out_right");
-            const cIn = pointForMatch(center, "in_left");
-            svg.appendChild(drawPath(aOut.x, aOut.y, cIn.x, cIn.y, "to_right"));
-          }
-          if (isVisible(rightFinal) && isVisible(center)) {
-            const aOut = pointForMatch(rightFinal, "out_left");
-            const cIn = pointForMatch(center, "in_right");
-            svg.appendChild(drawPath(aOut.x, aOut.y, cIn.x, cIn.y, "to_left"));
-          }
-        }
-
-        function fitToScreen(maxScale) {
-          inner.style.transformOrigin = "0 0";
-          const availW = wrap.clientWidth || 1;
-          const availH = wrap.clientHeight || 1;
-          const cap = Number.isFinite(Number(maxScale)) ? Number(maxScale) : 1;
-
-          const nodes = Array.from(inner.querySelectorAll(".brMatch")).filter(isVisible);
-          let minX = Infinity;
-          let minY = Infinity;
-          let maxX = -Infinity;
-          let maxY = -Infinity;
-          for (const n of nodes) {
-            const x1 = n.offsetLeft || 0;
-            const y1 = n.offsetTop || 0;
-            const x2 = x1 + (n.offsetWidth || 0);
-            const y2 = y1 + (n.offsetHeight || 0);
-            if (x1 < minX) minX = x1;
-            if (y1 < minY) minY = y1;
-            if (x2 > maxX) maxX = x2;
-            if (y2 > maxY) maxY = y2;
-          }
-          if (!nodes.length || !Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-            const contentW = inner.scrollWidth || inner.offsetWidth || 1;
-            const contentH = inner.scrollHeight || inner.offsetHeight || 1;
-            const scaleW = (availW - 8) / contentW;
-            const scaleH = (availH - 8) / contentH;
-            const scale = Math.max(0.15, Math.min(cap, scaleW, scaleH));
-            const scaledW = contentW * scale;
-            const scaledH = contentH * scale;
-            const tx = Math.max(0, Math.floor((availW - scaledW) / 2));
-            const ty = Math.max(0, Math.floor((availH - scaledH) / 2));
-            inner.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-            return;
-          }
-
-          const boxW = Math.max(1, maxX - minX);
-          const boxH = Math.max(1, maxY - minY);
-          const scaleW = (availW - 8) / boxW;
-          const scaleH = (availH - 8) / boxH;
-          const scale = Math.max(0.15, Math.min(cap, scaleW, scaleH));
-          const tx = Math.floor((availW - boxW * scale) / 2 - minX * scale);
-          const ty = Math.floor((availH - boxH * scale) / 2 - minY * scale);
-          inner.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-        }
-
         function setActiveButtons(size) {
           const map = { 8: BTN_8, 16: BTN_16, 32: BTN_32 };
-          for (const k of [BTN_8, BTN_16, BTN_32]) k.classList.remove("btn--selected");
+          for (const k of [BTN_8, BTN_16, BTN_32]) if (k) k.classList.remove("btn--selected");
           if (map[size]) map[size].classList.add("btn--selected");
         }
 
-        function roundsForSize(size) {
-          const sideSize = size / 2;
-          return Math.log2(sideSize);
+        function choiceImg(choice) {
+          const c = String(choice || "").toLowerCase().trim();
+          if (c === "piedra") return "/static/rps/PIEDRA.png";
+          if (c === "papel") return "/static/rps/PAPEL.png";
+          if (c === "tijera") return "/static/rps/TIJERA.png";
+          return "";
         }
 
-        function clampStage(stage, size) {
-          const rounds = roundsForSize(size);
-          return Math.max(0, Math.min(rounds, stage));
+        function pickHtml(choice) {
+          const img = choiceImg(choice);
+          if (!img) return `<span class="brPickText">—</span>`;
+          return `<img class="brPickIcon" src="${esc(img)}" alt="${esc(choice)}" />`;
         }
 
-        function applyStage(stage, size) {
-          stage = clampStage(stage, size);
-          currentStage = stage;
-          const rounds = roundsForSize(size);
-          if (BTN_PREV) BTN_PREV.disabled = stage <= 0;
-          if (BTN_NEXT) BTN_NEXT.disabled = stage >= rounds;
+        function playerRowHtml(handle, avatar, choice, extraClass) {
+          const h = normalizeHandle(handle);
+          const a = String(avatar || "").trim() || "/static/rps/INI1.png";
+          const cls = extraClass ? `brPlayerRow ${extraClass}` : "brPlayerRow";
+          return `<div class="${cls}">
+            <img class="brPlayerAvatar" src="${esc(a)}" alt="${esc(h || "Jugador")}" referrerpolicy="no-referrer" />
+            <div class="brPlayerName">${esc(h || "—")}</div>
+            <div class="brPlayerPick">${pickHtml(choice)}</div>
+          </div>`;
+        }
 
-          const left = inner.querySelector(".brSide--left");
-          const right = inner.querySelector(".brSide--right");
-          if (left) {
-            for (const col of left.querySelectorAll(".brCol")) {
-              const r = Number(col.dataset.round || "0");
-              col.style.display = r < stage ? "none" : "";
-            }
-            left.style.display = stage >= rounds ? "none" : "";
+        function matchCardHtml(mc) {
+          if (!mc) {
+            return `<div class="brDuelCard brDuelCard--empty">
+              <div class="brDuelHead">
+                <div class="brDuelTitle">Sala</div>
+                <div class="brDuelMeta">—</div>
+              </div>
+              <div class="brPlayers">
+                ${playerRowHtml("", "", "")}
+                ${playerRowHtml("", "", "")}
+              </div>
+            </div>`;
           }
-          if (right) {
-            for (const col of right.querySelectorAll(".brCol")) {
-              const r = Number(col.dataset.round || "0");
-              col.style.display = r < stage ? "none" : "";
-            }
-            right.style.display = stage >= rounds ? "none" : "";
-          }
 
-          setTimeout(() => {
-            const zoom = stage === 0 ? 1 : (stage >= rounds ? 1.55 : 1.35);
-            fitToScreen(zoom);
-            rebuildLines(size, currentLeftRounds, currentRightRounds);
-          }, 0);
+          const rid = String(mc.room_id || "").trim();
+          const live = rid ? (liveByRoomId.get(rid) || null) : null;
+          const p1c = live ? String(live.p1_choice || "") : "";
+          const p2c = live ? String(live.p2_choice || "") : "";
+          const state = live ? String(live.state || "") : "";
+
+          const p1 = normalizeHandle(mc.p1_handle || "");
+          const p2 = normalizeHandle(mc.p2_handle || "");
+          const a1 = String(mc.p1_avatar || "").trim();
+          const a2 = String(mc.p2_avatar || "").trim();
+
+          const sc1 = Number.isFinite(Number(mc.p1_score)) ? Number(mc.p1_score) : 0;
+          const sc2 = Number.isFinite(Number(mc.p2_score)) ? Number(mc.p2_score) : 0;
+          const rNow = Number.isFinite(Number(mc.round)) ? Number(mc.round) : 0;
+          const rTot = Number.isFinite(Number(mc.rounds_total)) ? Number(mc.rounds_total) : 3;
+          const meta = rNow ? `Marcador ${sc1}-${sc2} · R${rNow}/${rTot}` : (sc1 || sc2 ? `Marcador ${sc1}-${sc2}` : "—");
+          const finished = Boolean(mc && mc.finished);
+          const win = finished ? normalizeHandle(mc.winner_handle || "") : "";
+          const lose = finished ? normalizeHandle(mc.loser_handle || "") : "";
+          const p1Class = win && p1 && win === p1 ? "brPlayerRow--winner" : (lose && p1 && lose === p1 ? "brPlayerRow--loser" : "");
+          const p2Class = win && p2 && win === p2 ? "brPlayerRow--winner" : (lose && p2 && lose === p2 ? "brPlayerRow--loser" : "");
+          const winnerText = win ? ` · GANADOR ${win}` : "";
+
+          return `<div class="brDuelCard">
+            <div class="brDuelHead">
+              <div class="brDuelTitle">Sala ${esc(String(mc.index || ""))} <span class="brSmall">(${esc(String(mc.code || ""))})</span></div>
+              <div class="brDuelMeta">${esc(meta)}${state ? ` · ${esc(state)}` : ""}${winnerText ? esc(winnerText) : ""}</div>
+            </div>
+            <div class="brPlayers">
+              ${playerRowHtml(p1, a1, p1c, p1Class)}
+              ${playerRowHtml(p2, a2, p2c, p2Class)}
+            </div>
+          </div>`;
         }
 
-        function render(size) {
-          size = size === 8 || size === 16 || size === 32 ? size : 32;
-          currentSize = size;
-          if (statusEl) statusEl.textContent = `Mostrando: ${size}`;
-          setActiveButtons(size);
-          inner.innerHTML = "";
-          wrap.classList.remove("bracketWrap--in");
-          void wrap.offsetWidth;
-          wrap.classList.add("bracketWrap--in");
-
-          const left = buildSide("left", size, currentSeeds, currentMatchCodes);
-          const right = buildSide("right", size, currentSeeds, currentMatchCodes);
-
-          const centerCol = el("div", "brCenter");
-          const centerMatch = matchBox("center", 0, 0, slotHtml("Ganador Izq", ""), slotHtml("Ganador Der", ""), "", "", "");
-          centerCol.appendChild(centerMatch);
-
-          inner.appendChild(left.el);
-          inner.appendChild(centerCol);
-          inner.appendChild(right.el);
-
-          currentLeftRounds = left.rounds;
-          currentRightRounds = right.rounds;
-          setTimeout(() => {
-            const zoom = currentStage === 0 ? 1 : (currentStage >= roundsForSize(size) ? 1.55 : 1.35);
-            fitToScreen(zoom);
-            rebuildLines(size, left.rounds, right.rounds);
-            applyStage(currentStage, size);
-          }, 0);
-        }
-
-        function bind(btn, size) {
-          if (!btn) return;
-          btn.addEventListener("click", () => render(size));
-        }
-
-        bind(BTN_8, 8);
-        bind(BTN_16, 16);
-        bind(BTN_32, 32);
-
-        if (BTN_NEXT) {
-          BTN_NEXT.addEventListener("click", () => {
-            applyStage(currentStage + 1, currentSize);
-          });
-        }
-        if (BTN_PREV) {
-          BTN_PREV.addEventListener("click", () => {
-            applyStage(currentStage - 1, currentSize);
-          });
-        }
-
-        window.addEventListener("resize", () => {
-          const rounds = roundsForSize(currentSize);
-          const zoom = currentStage === 0 ? 1 : (currentStage >= rounds ? 1.55 : 1.35);
-          fitToScreen(zoom);
-          rebuildLines(currentSize, currentLeftRounds, currentRightRounds);
-        });
-
-        function seedsFromLobby(payload, size) {
+        function sizeFromLobby(payload) {
           const bSize = payload && Number.isFinite(payload.bracket_size) ? payload.bracket_size : 0;
-          const bSeeds = payload && Array.isArray(payload.bracket_seeds) ? payload.bracket_seeds : null;
-          if (bSize && bSeeds && bSeeds.length) {
-            const out = [];
-            for (const s of bSeeds) {
-              if (s && (s.handle || s.avatar_url)) out.push({ handle: String(s.handle || ""), avatar_url: String(s.avatar_url || "") });
-            }
-            while (out.length < bSize) out.push({ handle: "", avatar_url: "" });
-            return { size: bSize, seeds: out.slice(0, bSize) };
-          }
-          const out = [];
-          const approved = payload && Array.isArray(payload.approved) ? payload.approved : [];
-          const pending = payload && Array.isArray(payload.pending) ? payload.pending : [];
-          const all = [...approved, ...pending].filter((p) => p && p.handle);
-          all.sort((a, b) => (Number(b.total_value) || 0) - (Number(a.total_value) || 0));
-          for (const p of all) {
-            out.push({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") });
-            if (out.length >= size) break;
-          }
-          while (out.length < size) out.push({ handle: "", avatar_url: "" });
-          return { size, seeds: out };
+          if (bSize === 8 || bSize === 16 || bSize === 32) return bSize;
+          return currentSize;
         }
+
+        function stageRoundNumber(subtreeSize) {
+          const s = Number(subtreeSize);
+          if (!Number.isFinite(s) || s <= 0) return 1;
+          const r = Math.round(Math.log2(s)) + 1;
+          return Math.max(1, Math.min(6, r));
+        }
+
+        function matchCodesForBracket(size, matchCodes) {
+          const list = Array.isArray(matchCodes) ? matchCodes.slice(0) : [];
+          list.sort((a, b) => (Number(a && a.index) || 0) - (Number(b && b.index) || 0));
+          const max = size / 2;
+          const out = [];
+          for (const mc of list) {
+            const idx = Number(mc && mc.index);
+            if (!Number.isFinite(idx)) continue;
+            if (idx < 1 || idx > max) continue;
+            out.push(mc);
+          }
+          return out;
+        }
+
+        function activeSubtreeForStage(size, matchCodes) {
+          const list = matchCodesForBracket(size, matchCodes);
+          let minUnfinished = Infinity;
+          let maxAny = 1;
+          for (const mc of list) {
+            const sub = mc && Number.isFinite(Number(mc.subtree_size)) ? Number(mc.subtree_size) : 1;
+            const hasPlayers = Boolean(normalizeHandle(mc && mc.p1_handle) || normalizeHandle(mc && mc.p2_handle));
+            const hasHist = Boolean(mc && Array.isArray(mc.history) && mc.history.length);
+            if (sub > maxAny) maxAny = sub;
+            if (!hasPlayers && !hasHist) continue;
+            const finished = Boolean(mc && mc.finished);
+            if (!finished && sub < minUnfinished) minUnfinished = sub;
+          }
+          if (Number.isFinite(minUnfinished)) return minUnfinished;
+          return maxAny;
+        }
+
+        function render() {
+          if (!grid) return;
+          const stageSub = activeSubtreeForStage(currentSize, currentMatchCodes);
+          const listAll = matchCodesForBracket(currentSize, currentMatchCodes);
+          const stageMatches = listAll.filter((mc) => {
+            const sub = mc && Number.isFinite(Number(mc.subtree_size)) ? Number(mc.subtree_size) : 1;
+            if (sub !== stageSub) return false;
+            const hasPlayers = Boolean(normalizeHandle(mc && mc.p1_handle) || normalizeHandle(mc && mc.p2_handle));
+            const hasHist = Boolean(mc && Array.isArray(mc.history) && mc.history.length);
+            return hasPlayers || hasHist;
+          });
+          stageMatches.sort((a, b) => (Number(a && a.index) || 0) - (Number(b && b.index) || 0));
+
+          const boxes = [];
+          const boxCount = Math.max(1, Math.ceil(stageMatches.length / 2));
+          for (let b = 0; b < boxCount; b += 1) {
+            const m1 = stageMatches[b * 2] || null;
+            const m2 = stageMatches[b * 2 + 1] || null;
+            const duelHtml = [m1, m2].filter(Boolean).map((m) => matchCardHtml(m)).join("");
+            boxes.push(`<section class="brTableCard" data-stage-sub="${esc(String(stageSub))}">
+              <div class="brTableHead">
+                <div class="brTableTitle">Cuadro ${b + 1}</div>
+                <div class="brTableSub">4 jugadores · 2 salas</div>
+              </div>
+              <div class="brDuels">
+                ${duelHtml || matchCardHtml(null)}
+              </div>
+            </section>`);
+          }
+          grid.innerHTML = boxes.join("");
+          if (statusEl) statusEl.textContent = `Ronda ${stageRoundNumber(stageSub)} · ${stageMatches.length || 0} salas`;
+        }
+
+        function setSize(size) {
+          currentSize = size === 8 || size === 16 || size === 32 ? size : 32;
+          setActiveButtons(currentSize);
+          render();
+        }
+
+        if (BTN_8) BTN_8.addEventListener("click", () => setSize(8));
+        if (BTN_16) BTN_16.addEventListener("click", () => setSize(16));
+        if (BTN_32) BTN_32.addEventListener("click", () => setSize(32));
 
         const sock = window.io ? window.io({ transports: ["websocket", "polling"] }) : null;
-        if (sock) {
-          sock.on("connect", () => {
-            sock.emit("join", { room_id: "LOBBY", mode: "lobby_participants" });
-          });
-          sock.on("lobby_state", (payload) => {
-            const r = seedsFromLobby(payload, currentSize);
-            currentSize = r.size;
-            currentSeeds = r.seeds;
-            currentMatchCodes = (payload && Array.isArray(payload.match_codes)) ? payload.match_codes : [];
-            const prize = payload && Number.isFinite(payload.prize_value) ? payload.prize_value : 0;
-            if (statusEl) statusEl.textContent = `Mostrando: ${currentSize}`;
-            if (prizePill) prizePill.textContent = `Premio: ${prize ? fmtPrize(prize) : "—"}`;
-            render(currentSize);
-          });
-          sock.on("error_message", (payload) => {
-            if (statusEl && payload && payload.text) statusEl.textContent = payload.text;
-          });
-        }
+        if (!sock) return;
 
-        if (BTN_CLEAR) {
-          BTN_CLEAR.addEventListener("click", () => {
-            currentStage = 0;
-            currentSeeds = Array.from({ length: currentSize }, () => ({ handle: "", avatar_url: "" }));
-            if (sock) sock.emit("lobby_reset", {});
-            render(currentSize);
-          });
-        }
+        sock.on("connect", () => {
+          sock.emit("join", { room_id: "LOBBY", mode: "lobby_participants" });
+        });
 
-        currentSeeds = Array.from({ length: 32 }, (_, i) => ({ handle: `@jugador${i + 1}`, avatar_url: "/static/rps/INI1.png" }));
-        render(32);
+        sock.on("lobby_state", (payload) => {
+          currentSize = sizeFromLobby(payload);
+          setActiveButtons(currentSize);
+          currentMatchCodes = (payload && Array.isArray(payload.match_codes)) ? payload.match_codes : [];
+          const prize = payload && Number.isFinite(payload.prize_value) ? payload.prize_value : 0;
+          if (prizePill) prizePill.textContent = `Premio: ${prize ? fmtPrize(prize) : "—"}`;
+          const winners = payload && Array.isArray(payload.winners) ? payload.winners : [];
+          const champ = winners && winners[0] && winners[0].handle ? normalizeHandle(winners[0].handle) : "";
+          if (champ && statusEl) statusEl.textContent = `CAMPEÓN: ${champ}`;
+          render();
+        });
+
+        sock.on("lobby_live_state", (payload) => {
+          const list = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
+          liveByRoomId = new Map(list.map((r) => [String((r && r.room_id) || "").trim(), r]));
+          render();
+        });
+
+        sock.on("error_message", (payload) => {
+          if (statusEl && payload && payload.text) statusEl.textContent = payload.text;
+        });
+
+        setSize(32);
       })();
     </script>
   </body>

@@ -1350,6 +1350,113 @@ body{
 .page--bracket{align-items:flex-start}
 .app--bracket{width:min(1300px, 100%)}
 .bracketControls{display:flex; gap:10px; flex-wrap:wrap}
+.brTablesGrid{
+  margin-top: 12px;
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+.brTableCard{
+  border-radius: 18px;
+  border: 1px solid rgba(234,242,255,.10);
+  background: rgba(7,10,20,.22);
+  overflow:hidden;
+}
+.brTableHead{
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(234,242,255,.08);
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+}
+.brTableTitle{
+  font-weight: 1100;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+.brTableSub{
+  color: var(--muted);
+  font-weight: 850;
+  font-size: 12px;
+  white-space:nowrap;
+}
+.brDuels{
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.brDuelCard{
+  border-radius: 16px;
+  border: 1px solid rgba(110,243,255,.14);
+  background: rgba(7,10,20,.30);
+  overflow:hidden;
+}
+.brDuelCard--empty{
+  opacity: .55;
+}
+.brDuelHead{
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(234,242,255,.08);
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+}
+.brDuelTitle{
+  font-weight: 1100;
+  letter-spacing: .02em;
+  font-size: 13px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.brDuelMeta{
+  color: var(--muted);
+  font-weight: 850;
+  font-size: 12px;
+  text-align:right;
+  white-space:nowrap;
+}
+.brSmall{color: var(--muted); font-weight: 900; font-size: 12px}
+.brPlayers{display:flex; flex-direction:column}
+.brPlayerRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(234,242,255,.08);
+  min-width:0;
+}
+.brPlayerRow:first-child{border-top:none}
+.brPlayerRow--winner{
+  background: rgba(57,255,136,.10);
+}
+.brPlayerRow--loser{
+  background: rgba(255,77,109,.10);
+}
+.brPlayerAvatar{
+  width:30px;
+  height:30px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(110,243,255,.18);
+  background: rgba(110,243,255,.06);
+  flex:none;
+}
+.brPlayerName{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight: 1000;
+  font-size: 14px;
+}
+.brPlayerPick{margin-left:auto; display:flex; align-items:center; justify-content:flex-end; min-width:40px}
+.brPickIcon{width:30px; height:30px; object-fit:contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.35))}
+.brPickText{color: var(--muted); font-weight: 1000}
 .bracketWrap{
   position:relative;
   margin-top:12px;
@@ -1375,15 +1482,15 @@ body{
 }
 .bracketInner{
   position:relative;
-  min-width: 980px;
+  min-width: 1240px;
   display:flex;
-  gap:18px;
+  gap:22px;
   align-items:flex-start;
   transition: transform 900ms ease-in-out;
 }
 .brSide{
   display:flex;
-  gap:18px;
+  gap:22px;
   align-items:flex-start;
 }
 .brSide--right{flex-direction: row-reverse}
@@ -1396,28 +1503,28 @@ body{
   align-items:center;
   justify-content:center;
   padding: 0 10px;
-  min-width: 160px;
+  min-width: 220px;
 }
 .brMatch{
-  width: 170px;
-  border-radius: 14px;
+  width: 250px;
+  border-radius: 16px;
   border: 1px solid rgba(110,243,255,.14);
   background: rgba(7,10,20,.30);
   overflow:hidden;
 }
 .brScore{
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-top: 1px solid rgba(234,242,255,.08);
   color: var(--muted);
   font-weight: 900;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
 .brSlot{
-  padding: 8px 10px;
+  padding: 12px 14px;
   font-weight: 1000;
-  font-size: 12px;
+  font-size: 15px;
   letter-spacing: .02em;
   border-top: 1px solid rgba(234,242,255,.08);
   white-space:nowrap;
@@ -1439,8 +1546,8 @@ body{
   min-width:0;
 }
 .brAvatar{
-  width:22px;
-  height:22px;
+  width:30px;
+  height:30px;
   border-radius: 999px;
   object-fit: cover;
   border: 1px solid rgba(110,243,255,.18);

@@ -579,6 +579,7 @@ function hackPayload() {
 function emitHackState() {
   try {
     io.to(HACK_ID).emit("hack_state", { rooms: hackPayload(), ts: Date.now() });
+    io.to(LOBBY_ID).emit("lobby_live_state", { rooms: hackPayload(), ts: Date.now() });
   } catch {}
 }
 
@@ -592,6 +593,42 @@ function isBotHandle(handle) {
 function botSidForHandle(handle) {
   const h = normalizeHandle(handle);
   return `BOT:${h || "BOT"}`;
+}
+
+function allocLobbyBotHandle(existingLower) {
+  const used = existingLower instanceof Set ? existingLower : new Set();
+  let botCounter = botHandles.size + 1;
+  for (let tries = 0; tries < 5000; tries += 1) {
+    const idx = botCounter - 1;
+    const baseName = BOT_NAMES[idx % BOT_NAMES.length] || "Bot";
+    const cycle = Math.floor(idx / BOT_NAMES.length) + 1;
+    const base = normalizeHandle(baseName);
+    const suffix = cycle + tries;
+    const cand1 = suffix === 1 ? base : `${base}${suffix}`;
+    if (!used.has(cand1.toLowerCase()) && !lobby.participants.has(cand1)) return cand1;
+    const cand2 = suffix === 1 ? `${base}BOT` : `${base}BOT${suffix}`;
+    if (!used.has(cand2.toLowerCase()) && !lobby.participants.has(cand2)) return cand2;
+    botCounter += 1;
+  }
+  return `${BOT_PREFIX}${String(botHandles.size + 1).padStart(3, "0")}`;
+}
+
+function ensureBracketFilledWithBots(candidates, targetSize) {
+  if (!Array.isArray(candidates)) return [];
+  const out = candidates.slice(0);
+  const used = new Set(out.map((c) => String(c && c.handle ? c.handle : "").toLowerCase()).filter(Boolean));
+  while (out.length < targetSize) {
+    const h = allocLobbyBotHandle(used);
+    used.add(String(h).toLowerCase());
+    if (!lobby.participants.has(h)) {
+      lobby.participants.set(h, { handle: h, avatar_url: "/static/rps/INI1.png", total_value: 0, gifts: [] });
+    }
+    botHandles.add(h);
+    lobby.approved.add(h);
+    const p = lobby.participants.get(h);
+    out.push({ handle: h, avatar_url: String((p && p.avatar_url) || "/static/rps/INI1.png").trim(), total_value: 0 });
+  }
+  return out.slice(0, targetSize);
 }
 
 function duelEnsureBotSids(duelRoom) {
@@ -681,6 +718,26 @@ function normalizeHandle(v) {
   const raw = String(v || "").trim();
   if (!raw) return "";
   return raw.startsWith("@") ? raw : `@${raw}`;
+}
+
+function lobbyEffectiveBracketSize() {
+  const seeds = Array.isArray(lobby.bracket_seeds) ? lobby.bracket_seeds : [];
+  let count = 0;
+  for (const s of seeds) {
+    const h = normalizeHandle(s && s.handle ? s.handle : "");
+    if (h) count += 1;
+  }
+  if (!count) count = lobby && lobby.approved && lobby.approved instanceof Set ? lobby.approved.size : 0;
+  count = Math.max(2, Math.min(32, Number.isFinite(count) ? count : 0));
+  let size = 2;
+  while (size < count) size *= 2;
+  return Math.max(2, Math.min(32, size));
+}
+
+function lobbyFinalSubtreeTarget() {
+  const bracketSize = lobbyEffectiveBracketSize();
+  const sideSize = Math.max(1, Math.floor(bracketSize / 2));
+  return sideSize;
 }
 
 function lobbyUpsertDonation({ handle, avatar_url, gift_name, gift_value, gift_count }) {
@@ -1022,21 +1079,29 @@ function duelFinalizeMatch(roomId) {
       ? sids[0]
       : sids[1];
 
-  if (idxSelf && winnerSid && curSub >= 16) {
+  const finalTarget = lobbyFinalSubtreeTarget();
+  if (idxSelf && curSub >= finalTarget) {
     const wh = normalizeHandle(winnerProfile.handle);
-    const already = (Array.isArray(lobby.winners) ? lobby.winners : []).some((w) => normalizeHandle(w && w.handle ? w.handle : "") === wh);
-    if (!already) {
-      const p = lobby.participants.get(wh);
-      lobby.winners.unshift({
-        handle: wh,
-        avatar_url: String((p && p.avatar_url) ? p.avatar_url : (winnerProfile.avatar_url || "")).trim(),
-        total_value: p && Number.isFinite(p.total_value) ? p.total_value : 0,
-        prize_value: Number.isFinite(lobby.prize_value) ? lobby.prize_value : 0,
-        at: Date.now(),
-      });
-      io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
-      io.to(LOBBY_ID).emit("lobby_status", { text: `Ganador: ${wh}` });
+    const p = lobby.participants.get(wh);
+    const champEntry = {
+      handle: wh,
+      avatar_url: String((p && p.avatar_url) ? p.avatar_url : (winnerProfile.avatar_url || "")).trim(),
+      total_value: p && Number.isFinite(p.total_value) ? p.total_value : 0,
+      prize_value: Number.isFinite(lobby.prize_value) ? lobby.prize_value : 0,
+      at: Date.now(),
+    };
+    const prev = Array.isArray(lobby.winners) && lobby.winners.length ? lobby.winners[0] : null;
+    const samePrev =
+      prev &&
+      normalizeHandle(prev.handle) === wh &&
+      Number(prev.prize_value) === Number(champEntry.prize_value) &&
+      Math.abs(Number(champEntry.at) - Number(prev.at || 0)) < 60_000;
+    if (!samePrev) {
+      if (!Array.isArray(lobby.winners)) lobby.winners = [];
+      lobby.winners.unshift(champEntry);
     }
+    io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
+    io.to(LOBBY_ID).emit("lobby_status", { text: `CAMPEÓN: ${wh}` });
   }
 
   if (idxSelf && winnerSid && nextSub <= 16) {
@@ -1190,6 +1255,14 @@ async function startCountdownIfReady(roomId) {
   duelEnsureBotSids(room);
   const sids = Array.isArray(room.slot_sids) ? room.slot_sids : [null, null];
   if (!sids[0] || !sids[1]) return;
+  const profs = Array.isArray(room.slot_profiles) ? room.slot_profiles : [{}, {}];
+  const h1 = normalizeHandle((profs[0] && profs[0].handle) || "");
+  const h2 = normalizeHandle((profs[1] && profs[1].handle) || "");
+  if (!h1 || !h2) {
+    room.state = "waiting";
+    broadcastRoomState(room);
+    return;
+  }
   if (room.manual_start && !room.started) {
     room.state = "waiting_admin";
     io.to(roomId).emit("status", { text: "Esperando que el admin inicie la sala..." });
@@ -1219,6 +1292,14 @@ async function startCountdownIfReady(roomId) {
     const rsids = Array.isArray(r.slot_sids) ? r.slot_sids : [null, null];
     if (!rsids[0] || !rsids[1]) {
       r.state = "waiting";
+      return;
+    }
+    const rprofs = Array.isArray(r.slot_profiles) ? r.slot_profiles : [{}, {}];
+    const rh1 = normalizeHandle((rprofs[0] && rprofs[0].handle) || "");
+    const rh2 = normalizeHandle((rprofs[1] && rprofs[1].handle) || "");
+    if (!rh1 || !rh2) {
+      r.state = "waiting";
+      broadcastRoomState(r);
       return;
     }
     r.state = "playing";
@@ -1805,6 +1886,7 @@ io.on("connection", (socket) => {
         is_admin: mode === "lobby_admin",
       });
       socket.emit("lobby_state", lobbyPayload());
+      socket.emit("lobby_live_state", { rooms: hackPayload(), ts: Date.now() });
       return;
     }
 
@@ -1991,7 +2073,20 @@ io.on("connection", (socket) => {
     const profs = Array.isArray(room.slot_profiles) ? room.slot_profiles : [{}, {}];
     const a1 = normalizeHandle((profs[0] && profs[0].handle) || "");
     const a2 = normalizeHandle((profs[1] && profs[1].handle) || "");
-    if (a1 && a2 && wantedHandle && wantedHandle !== a1 && wantedHandle !== a2) {
+    const lobbyMatch = lobbyMatchByRoomId(roomId);
+    if (lobbyMatch) {
+      if (!wantedHandle) {
+        socket.emit("error_message", { text: "Entra con tu @ (link con ?h=@usuario)." });
+        socket.disconnect(true);
+        return;
+      }
+      const allowed = [a1, a2].filter(Boolean);
+      if (allowed.length && !allowed.includes(wantedHandle)) {
+        socket.emit("error_message", { text: "Ese @ no pertenece a esta sala." });
+        socket.disconnect(true);
+        return;
+      }
+    } else if (wantedHandle && a1 && a2 && wantedHandle !== a1 && wantedHandle !== a2) {
       socket.emit("error_message", { text: "Ese @ no pertenece a esta sala." });
       socket.disconnect(true);
       return;
@@ -2028,7 +2123,7 @@ io.on("connection", (socket) => {
         handle: wantedHandle || keepHandle || `Jugador ${slot + 1}`,
         avatar_url: cur.avatar_url ? String(cur.avatar_url).trim() : avatarFromLobby,
       };
-      const mc = lobbyMatchByRoomId(roomId);
+      const mc = lobbyMatch;
       if (mc && wantedHandle) {
         lobby.match_codes = (Array.isArray(lobby.match_codes) ? lobby.match_codes : []).map((m) => {
           if (!m || String(m.room_id || "").trim() !== roomId) return m;
@@ -2447,7 +2542,8 @@ io.on("connection", (socket) => {
 
     const roomsTargetRaw = Number.parseInt(String((data && data.rooms_count) || "0"), 10);
     const roomsTarget = roomsTargetRaw === 2 || roomsTargetRaw === 5 || roomsTargetRaw === 10 ? roomsTargetRaw : 2;
-    const needPlayers = roomsTarget * 2;
+    const bracketTargetSize = roomsTarget === 10 ? 32 : roomsTarget === 5 ? 16 : 8;
+    const needPlayers = bracketTargetSize;
 
     const candidates = [];
     for (const hRaw of lobby.approved) {
@@ -2498,9 +2594,7 @@ io.on("connection", (socket) => {
       [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
     }
 
-    let size = 8;
-    while (size < needPlayers) size *= 2;
-    size = Math.max(8, Math.min(32, size));
+    const size = bracketTargetSize;
 
     const seeds = candidates.slice(0, size).map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
     while (seeds.length < size) seeds.push({ handle: "", avatar_url: "" });
@@ -2511,7 +2605,7 @@ io.on("connection", (socket) => {
     lobby.bracket_seeds = seeds.slice(0, size);
 
     const pairsAll = lobbyPairsFromSeeds();
-    const pairs = pairsAll.filter((p) => p && p.p1_handle && p.p2_handle).slice(0, roomsTarget);
+    const pairs = pairsAll.filter((p) => p && p.p1_handle && p.p2_handle);
     if (!pairs.length) {
       io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
       io.to(LOBBY_ID).emit("lobby_status", { text: "Bots listos. Falta emparejar." });
@@ -2710,10 +2804,12 @@ io.on("connection", (socket) => {
       [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
     }
 
-    const size = 32;
+    let size = 8;
+    while (size < candidates.length) size *= 2;
+    size = Math.max(8, Math.min(32, size));
+    const filled = ensureBracketFilledWithBots(candidates, size);
 
-    const seeds = candidates.map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
-    while (seeds.length < size) seeds.push({ handle: "", avatar_url: "" });
+    const seeds = filled.map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
     lobby.match_codes = [];
     lobbyCodeToRoom.clear();
 
@@ -2721,7 +2817,7 @@ io.on("connection", (socket) => {
     lobby.bracket_seeds = seeds.slice(0, size);
 
     io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
-    io.to(LOBBY_ID).emit("lobby_status", { text: `Emparejado: ${Math.min(candidates.length, size)}/${size}` });
+    io.to(LOBBY_ID).emit("lobby_status", { text: `Emparejado: ${Math.min(filled.length, size)}/${size}` });
   });
 
   socket.on("tournament_generate_bracket", () => {
