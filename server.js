@@ -2448,7 +2448,6 @@ io.on("connection", (socket) => {
     lobby.approved.clear();
     lobby.kicked.clear();
     lobby.eliminated.clear();
-    lobby.winners = [];
     lobby.total_value = 0;
     lobby.bracket_size = 0;
     lobby.bracket_seeds = [];
@@ -2456,7 +2455,22 @@ io.on("connection", (socket) => {
     lobbyCodeToRoom.clear();
     botHandles.clear();
     io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
-    io.to(LOBBY_ID).emit("lobby_status", { text: "Lobby reiniciado" });
+    io.to(LOBBY_ID).emit("lobby_status", { text: "Torneo reiniciado (premios conservados)" });
+  });
+
+  socket.on("lobby_clear_winners", () => {
+    const roomId = sidToRoom.get(socket.id);
+    if (roomId !== LOBBY_ID) {
+      socket.emit("error_message", { text: "No estás en el lobby." });
+      return;
+    }
+    if (!canControlLobbyFromSocket(socket)) {
+      socket.emit("error_message", { text: "No tienes permiso para limpiar ganadores." });
+      return;
+    }
+    lobby.winners = [];
+    io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
+    io.to(LOBBY_ID).emit("lobby_status", { text: "Ganadores eliminados" });
   });
 
   socket.on("lobby_generate_match_codes", () => {

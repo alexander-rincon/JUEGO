@@ -113,6 +113,7 @@ const lobbyGiftName = $("lobbyGiftName");
 const lobbyGiftValue = $("lobbyGiftValue");
 const lobbyAvatarUrl = $("lobbyAvatarUrl");
 const lobbyAddDonationBtn = $("lobbyAddDonationBtn");
+const lobbyClearWinnersBtn = $("lobbyClearWinnersBtn");
 
 const buttons = [
   $("btnPiedra"),
@@ -1335,6 +1336,13 @@ if (lobbyResetBtn) {
   lobbyResetBtn.addEventListener("click", () => {
     if (!IS_LOBBY) return;
     socket.emit("lobby_reset", {});
+  });
+}
+
+if (lobbyClearWinnersBtn) {
+  lobbyClearWinnersBtn.addEventListener("click", () => {
+    if (!IS_LOBBY) return;
+    socket.emit("lobby_clear_winners", {});
   });
 }
 
