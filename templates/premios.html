@@ -18,6 +18,7 @@
             <div class="premiosPrize__label">Premio</div>
             <div class="premiosPrize__value" id="premiosPrize">—</div>
           </div>
+          <button class="btn btn--rock" id="lobbyClearWinnersBtn" type="button" style="margin-left: 20px; font-size: 12px; padding: 6px 12px;">Limpiar Ganadores</button>
         </div>
         <div class="premiosList" id="premiosList"></div>
       </section>
@@ -29,6 +30,7 @@
         const prizeEl = document.getElementById("premiosPrize");
         const statusEl = document.getElementById("premiosStatus");
         const listEl = document.getElementById("premiosList");
+        const clearBtn = document.getElementById("lobbyClearWinnersBtn");
 
         function esc(s) {
           return String(s || "")
@@ -46,6 +48,14 @@
 
         const sock = window.io ? window.io({ transports: ["websocket", "polling"] }) : null;
         if (!sock) return;
+
+        if (clearBtn) {
+          clearBtn.addEventListener("click", () => {
+            if (confirm("¿Estás seguro de que quieres eliminar a todos los ganadores?")) {
+              sock.emit("lobby_clear_winners", {});
+            }
+          });
+        }
 
         sock.on("connect", () => {
           sock.emit("join", { room_id: "LOBBY", mode: "lobby_participants" });

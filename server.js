@@ -1142,6 +1142,7 @@ async function duelRunPickTimer(roomId, battleSeconds) {
     const sids = Array.isArray(room.slot_sids) ? room.slot_sids : [null, null];
     if (!sids[0] || !sids[1]) return;
     io.to(roomId).emit("pick_timer", { seconds: remaining });
+    if (room.choices.size >= 2) break;
     await sleep(1000);
   }
 
@@ -2076,8 +2077,18 @@ io.on("connection", (socket) => {
     const lobbyMatch = lobbyMatchByRoomId(roomId);
     if (lobbyMatch) {
       if (!wantedHandle) {
-        socket.emit("error_message", { text: "Entra con tu @ (link con ?h=@usuario)." });
-        socket.disconnect(true);
+        // Espectador (no se desconecta, solo no toma slot)
+        sidToRoom.set(socket.id, roomId);
+        socket.join(roomId);
+        socket.emit("joined", {
+          room_id: roomId,
+          you_are: "Espectador",
+          share_url: `${defaultBaseUrl}/juego/${roomId}`,
+          qr_path: `/qr/${roomId}.png`,
+          mode,
+          is_admin: false,
+        });
+        broadcastRoomState(room);
         return;
       }
       const allowed = [a1, a2].filter(Boolean);
@@ -2818,20 +2829,25 @@ io.on("connection", (socket) => {
       [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
     }
 
-    let size = 8;
+    // Calcular tamaño del bracket (potencia de 2) basado solo en candidatos reales
+    let size = 2;
     while (size < candidates.length) size *= 2;
-    size = Math.max(8, Math.min(32, size));
-    const filled = ensureBracketFilledWithBots(candidates, size);
+    size = Math.max(2, Math.min(32, size));
 
-    const seeds = filled.map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
+    const seeds = candidates.slice(0, size).map((p) => ({ handle: String(p.handle || ""), avatar_url: String(p.avatar_url || "") }));
+    // Rellenar huecos vacíos si sobran (sin bots automáticos)
+    while (seeds.length < size) {
+      seeds.push({ handle: "", avatar_url: "" });
+    }
+
     lobby.match_codes = [];
     lobbyCodeToRoom.clear();
 
     lobby.bracket_size = size;
-    lobby.bracket_seeds = seeds.slice(0, size);
+    lobby.bracket_seeds = seeds;
 
     io.to(LOBBY_ID).emit("lobby_state", lobbyPayload());
-    io.to(LOBBY_ID).emit("lobby_status", { text: `Emparejado: ${Math.min(filled.length, size)}/${size}` });
+    io.to(LOBBY_ID).emit("lobby_status", { text: `Emparejado: ${candidates.length}/${size}` });
   });
 
   socket.on("tournament_generate_bracket", () => {

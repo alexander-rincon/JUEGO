@@ -113,7 +113,6 @@ const lobbyGiftName = $("lobbyGiftName");
 const lobbyGiftValue = $("lobbyGiftValue");
 const lobbyAvatarUrl = $("lobbyAvatarUrl");
 const lobbyAddDonationBtn = $("lobbyAddDonationBtn");
-const lobbyClearWinnersBtn = $("lobbyClearWinnersBtn");
 
 const buttons = [
   $("btnPiedra"),
@@ -216,6 +215,35 @@ function exitTieModal() {
     } catch {}
     hideTieModal();
   };
+}
+
+let tieOverlayEl = null;
+function ensureTieOverlay() {
+  if (tieOverlayEl) return;
+  tieOverlayEl = document.createElement("div");
+  tieOverlayEl.className = "tie-overlay";
+  tieOverlayEl.innerHTML = '<div class="tie-text">EMPATE</div>';
+  document.body.appendChild(tieOverlayEl);
+}
+
+function flashTieLabel(duration = 2000) {
+  ensureTieOverlay();
+  tieOverlayEl.classList.add("tie-overlay--show");
+  setTimeout(() => {
+    tieOverlayEl.classList.remove("tie-overlay--show");
+  }, duration);
+}
+
+function triggerTieClash() {
+  const p1 = document.querySelector(".player--left");
+  const p2 = document.querySelector(".player--right");
+  if (!p1 || !p2) return;
+  p1.classList.add("player--clash-p1");
+  p2.classList.add("player--clash-p2");
+  setTimeout(() => {
+    p1.classList.remove("player--clash-p1");
+    p2.classList.remove("player--clash-p2");
+  }, 1000);
 }
 
 function showTieModal({ p1Name, p2Name, durationMs }) {
@@ -1055,6 +1083,9 @@ socket.on("connect", () => {
   }
   if (IS_DUEL_ADMIN) {
     socket.emit("join", { room_id: ROOM_ID, mode: "duel_admin" });
+    setStatus("Espectando sala...");
+    const actions = document.querySelector(".actions");
+    if (actions) actions.style.display = "none";
     return;
   }
   socket.emit("join", { room_id: ROOM_ID, mode: "duel", handle: SELF_HANDLE });
@@ -1339,13 +1370,6 @@ if (lobbyResetBtn) {
   });
 }
 
-if (lobbyClearWinnersBtn) {
-  lobbyClearWinnersBtn.addEventListener("click", () => {
-    if (!IS_LOBBY) return;
-    socket.emit("lobby_clear_winners", {});
-  });
-}
-
 if (lobbyBracketShuffleBtn) {
   lobbyBracketShuffleBtn.addEventListener("click", () => {
     if (!IS_LOBBY) return;
@@ -1492,7 +1516,13 @@ socket.on("round_result", (payload) => {
   const detail = `${n1}: ${p1} · ${n2}: ${p2}${roundTxt}`;
   showResult(payload.result_text || "Resultado", detail);
   const winnerSide = payload ? Number.parseInt(String(payload.winner_side ?? "0"), 10) : 0;
-  if (winnerSide === 1 || winnerSide === 2) triggerLoserFx(winnerSide);
+  if (winnerSide === 1 || winnerSide === 2) {
+    triggerLoserFx(winnerSide);
+  } else if (winnerSide === 0 && (p1ChoiceRaw || p2ChoiceRaw)) {
+    // Solo si al menos uno eligió (evitar flash si nadie tiró nada en absoluto)
+    flashTieLabel(2000);
+    triggerTieClash();
+  }
 });
 
 socket.on("duel_finished", (payload) => {
@@ -1512,8 +1542,16 @@ socket.on("tie_break_start", (payload) => {
   const p1Name = payload && payload.p1_name ? String(payload.p1_name) : (p1Name ? String(p1Name.textContent || "") : "Jugador 1");
   const p2Name = payload && payload.p2_name ? String(payload.p2_name) : (p2Name ? String(p2Name.textContent || "") : "Jugador 2");
   const durationMs = payload ? Number.parseInt(String(payload.duration_ms ?? "5000"), 10) : 5000;
-  showTieModal({ p1Name, p2Name, durationMs });
-  setStatus("Empate. Ruleta decidiendo...");
+  
+  // Mostrar letrero de EMPATE antes de la ruleta
+  flashTieLabel(2500);
+  triggerTieClash();
+  setStatus("¡Empate final! Preparando ruleta...");
+
+  setTimeout(() => {
+    showTieModal({ p1Name, p2Name, durationMs });
+    setStatus("Ruleta decidiendo el ganador...");
+  }, 2500);
 });
 
 socket.on("tie_break_result", (payload) => {

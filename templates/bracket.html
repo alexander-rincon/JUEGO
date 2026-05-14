@@ -13,10 +13,11 @@
           <h1 class="title">Bracket</h1>
           <p class="subtitle">8 cuadros · 2 salas por cuadro (parejas)</p>
         </div>
-        <div class="bracketControls">
+        <div class="bracketControls" id="bracketControls">
           <button class="btn btn--paper" id="bracketX2" type="button">X2</button>
           <button class="btn btn--paper" id="bracketX5" type="button">X5</button>
           <button class="btn btn--paper" id="bracketX10" type="button">X10</button>
+          <button class="btn btn--rock" id="bracketStartBtn" type="button" style="margin-left: 20px;">INICIAR SALAS</button>
         </div>
       </header>
 
@@ -39,6 +40,22 @@
         const BTN_8 = document.getElementById("bracketX2");
         const BTN_16 = document.getElementById("bracketX5");
         const BTN_32 = document.getElementById("bracketX10");
+        const START_BTN = document.getElementById("bracketStartBtn");
+        const CONTROLS = document.getElementById("bracketControls");
+
+        // Mostrar siempre los controles (solo lo vemos nosotros)
+        if (CONTROLS) {
+          CONTROLS.hidden = false;
+        }
+
+        if (START_BTN) {
+          START_BTN.addEventListener("click", () => {
+            if (confirm("¿Iniciar todas las salas listas?")) {
+              sock.emit("lobby_start_ready_duels", {});
+            }
+          });
+        }
+
         let currentSize = 32;
         let currentMatchCodes = [];
         let liveByRoomId = new Map();
@@ -110,9 +127,10 @@
 
           const rid = String(mc.room_id || "").trim();
           const live = rid ? (liveByRoomId.get(rid) || null) : null;
-          const p1c = live ? String(live.p1_choice || "") : "";
-          const p2c = live ? String(live.p2_choice || "") : "";
           const state = live ? String(live.state || "") : "";
+          // Ocultar jugadas si la sala está jugando (se ven solo al final del tiempo)
+          const p1c = (live && state !== "playing") ? String(live.p1_choice || "") : "";
+          const p2c = (live && state !== "playing") ? String(live.p2_choice || "") : "";
 
           const p1 = normalizeHandle(mc.p1_handle || "");
           const p2 = normalizeHandle(mc.p2_handle || "");
@@ -131,10 +149,15 @@
           const p2Class = win && p2 && win === p2 ? "brPlayerRow--winner" : (lose && p2 && lose === p2 ? "brPlayerRow--loser" : "");
           const winnerText = win ? ` · GANADOR ${win}` : "";
 
+          // Boton para admin
+          const viewBtn = rid ? `<button class="brViewBtn" onclick="window.open('/juego/${esc(rid)}', '_blank')">VER SALA</button>` : "";
+
           return `<div class="brDuelCard">
             <div class="brDuelHead">
-              <div class="brDuelTitle">Sala ${esc(String(mc.index || ""))} <span class="brSmall">(${esc(String(mc.code || ""))})</span></div>
-              <div class="brDuelMeta">${esc(meta)}${state ? ` · ${esc(state)}` : ""}${winnerText ? esc(winnerText) : ""}</div>
+              <div class="brDuelHeadMain">
+                <div class="brDuelTitle">Sala ${esc(String(mc.index || ""))} ${viewBtn}</div>
+                <div class="brDuelMeta">${esc(meta)}${state ? ` · ${esc(state)}` : ""}${winnerText ? esc(winnerText) : ""}</div>
+              </div>
             </div>
             <div class="brPlayers">
               ${playerRowHtml(p1, a1, p1c, p1Class)}
